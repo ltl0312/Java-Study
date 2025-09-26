@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/day01_code/day01_code.iml" filepath="$PROJECT_DIR$/day01_code/day01_code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day02_code/day02_code.iml" filepath="$PROJECT_DIR$/day02_code/day02_code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day03_code/day03_code.iml" filepath="$PROJECT_DIR$/day03_code/day03_code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day04-code/day04-code.iml" filepath="$PROJECT_DIR$/day04-code/day04-code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day05-code/day05-code.iml" filepath="$PROJECT_DIR$/day05-code/day05-code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day06-code/day06-code.iml" filepath="$PROJECT_DIR$/day06-code/day06-code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day07-code/day07-code.iml" filepath="$PROJECT_DIR$/day07-code/day07-code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/day08-code/day08-code.iml" filepath="$PROJECT_DIR$/day08-code/day08-code.iml" />
+      <module fileurl="file://$PROJECT_DIR$/itheima-employee-sys/itheima-employee-sys.iml" filepath="$PROJECT_DIR$/itheima-employee-sys/itheima-employee-sys.iml" />
+      <module fileurl="file://$PROJECT_DIR$/javaseaiproject.iml" filepath="$PROJECT_DIR$/javaseaiproject.iml" />
+    </modules>
+  </component>
+</project>
