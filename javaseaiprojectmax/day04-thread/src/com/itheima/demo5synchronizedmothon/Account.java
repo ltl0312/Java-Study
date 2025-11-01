@@ -1,0 +1,30 @@
+package com.itheima.demo5synchronizedmothon;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+
+public class Account {
+    private String CardID;
+    private double money;
+
+    //如果方法是实例方法:同步方法默认是this作为锁
+    //如果方法是静态方法:同步方法默认是类名.class作为锁
+    public synchronized void drawMoney(double money) {
+        //拿到当前是谁来取钱
+        String name = Thread.currentThread().getName();
+        //判断余额是否足够
+        if (this.money >= money) {
+            System.out.println(name + "取钱成功，取钱金额：" + money);
+            this.money -= money;
+            System.out.println(name + "取钱成功，余额为：" + this.money);
+        }
+        else {
+            System.out.println(name + "取钱失败，余额不足！");
+        }
+    }
+}
