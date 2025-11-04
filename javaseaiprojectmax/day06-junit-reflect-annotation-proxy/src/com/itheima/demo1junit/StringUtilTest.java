@@ -4,6 +4,8 @@ package com.itheima.demo1junit;
 import org.junit.Assert;
 import org.junit.Test;
 
+
+
 // 测试类：junit单元测试框架，对业务类中的业务方法进行正确性测试。
 public class StringUtilTest {
     // 测试方法：必须是公开public，无参，无返回值。
