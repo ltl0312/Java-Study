@@ -1,31 +1,32 @@
 package javaprogramming.demo17ProducerConsumerModel;
 
-public class Consumer extends Thread{
+public class Producer extends Thread{
     private Resource resource;
-    public Consumer() {
+    public Producer() {
     }
-    public Consumer(Resource resource) {
+    public Producer(Resource resource) {
         this.resource = resource;
     }
     @Override
     public void run() {
         while (true) {
             synchronized (resource) {
-                if (resource.getCount() > 0) {
-                    System.out.println(getName() + "正在消费" + resource.getName());
-                    resource.setCount(resource.getCount() - 1);
-                    System.out.println("剩余：" + resource.getCount());
-                    resource.notifyAll();
-                } else {
+                if (resource.getCount() >= 10) {
                     try {
                         resource.wait();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+                } else {
+                    resource.notifyAll();
                 }
+                resource.setName("产品" + resource.getCount());
+                resource.setCount(resource.getCount() + 1);
+                System.out.println(getName() + "生产了" + resource.getName());
+                System.out.println("库存：" + resource.getCount());
             }
             try {
-                Thread.sleep(1500);
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
