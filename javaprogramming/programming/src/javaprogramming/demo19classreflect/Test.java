@@ -1,6 +1,5 @@
 package javaprogramming.demo19classreflect;
 
-import java.io.File;
 import java.util.Scanner;
 
 public class Test {
