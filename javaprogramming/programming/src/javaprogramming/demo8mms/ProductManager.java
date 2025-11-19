@@ -25,6 +25,7 @@ public class ProductManager {
         for (Product p : products) {
             if (p.getName().contains(name)) {
                 System.out.println(p);
+                return;
             }
         }
         System.out.println("没有此商品");

@@ -7,7 +7,6 @@ public class User extends Thread{
     private OperateCount operateCount;
     private Scanner scanner;
 
-    // 构造函数，用于接收共享的OperateCount实例和Scanner
     public User(OperateCount operateCount, Scanner scanner) {
         this.operateCount = operateCount;
         this.scanner = scanner;

@@ -161,6 +161,7 @@ public class Test {
                     break;
                 case 7:
                     company.findMaxAndMinSalary();
+                    break;
                 case 8:
                     System.out.println("退出系统！");
                     return;

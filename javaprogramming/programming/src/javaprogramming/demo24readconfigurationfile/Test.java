@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Properties;
 
 public class Test {
-    // 建立键名映射关系
     private static final Map<String, String> KEY_MAPPING = new HashMap<>();
     static {
         KEY_MAPPING.put("module.type", "模块类型");
@@ -24,7 +23,6 @@ public class Test {
 
     public static void main(String[] args) {
         // 目标：编写程序，读取并解析一个配置文件（例如.properties文件）
-        //Properties类继承 HashMap，所以它也可以作为Map使用
         Properties properties = new Properties();
 
         try (

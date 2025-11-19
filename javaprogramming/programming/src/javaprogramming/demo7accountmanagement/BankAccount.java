@@ -1,6 +1,7 @@
 package javaprogramming.demo7accountmanagement;
 
-public class BankAccount {
+public class
+BankAccount {
     public void deposit(Account account, double amount){
         account.setBalance(account.getBalance() + amount);
         System.out.println("存款成功,请继续操作：");
