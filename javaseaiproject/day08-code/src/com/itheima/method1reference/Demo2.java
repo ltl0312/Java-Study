@@ -23,7 +23,7 @@ public class Demo2 {
 
         //Arrays.sort(students, (o1, o2) -> t.compareHeight(o1, o2));
 
-        //静态方法引用: 类名::静态方法名(Lambda表达式中只是通过对象名调用一个实例方法,并且只有"->"前后参数一致时才能简化)
+        //实例方法引用: 类名::实例方法名(Lambda表达式中只是通过对象名调用一个实例方法,并且只有"->"前后参数一致时才能简化)
         Arrays.sort(students, t::compareHeight);
 
 
