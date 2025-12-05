@@ -1,0 +1,187 @@
+package com.pms.gui.panels;
+
+import com.pms.utils.DBConnection;
+
+import javax.swing.*;
+import java.awt.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+public class DashboardPanel extends JPanel {
+
+    public DashboardPanel() {
+        initUI();
+    }
+
+    private void initUI() {
+        setLayout(new BorderLayout());
+
+        // 顶部标题
+        JLabel titleLabel = new JLabel("系统概览", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 20));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        add(titleLabel, BorderLayout.NORTH);
+
+        // 统计卡片面板
+        JPanel statsPanel = new JPanel(new GridLayout(2, 2, 20, 20));
+        statsPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
+
+        // 添加统计卡片
+        statsPanel.add(createStatCard("总员工数", getTotalEmployeeCount() + " 人", Color.decode("#4CAF50")));
+        statsPanel.add(createStatCard("部门总数", getDepartmentCount() + " 个", Color.decode("#2196F3")));
+        statsPanel.add(createStatCard("在职员工", getActiveEmployeeCount() + " 人", Color.decode("#FF9800")));
+        statsPanel.add(createStatCard("人事变动", getPersonnelChanges() + " 条", Color.decode("#F44336")));
+
+        add(statsPanel, BorderLayout.CENTER);
+
+        // 底部信息
+        JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footerPanel.add(new JLabel("数据更新时间: " + java.time.LocalDateTime.now().toString().substring(0, 16)));
+        add(footerPanel, BorderLayout.SOUTH);
+    }
+
+    /**
+     * 创建统计卡片
+     */
+    private JPanel createStatCard(String title, String value, Color color) {
+        JPanel card = new JPanel(new BorderLayout());
+        card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+        card.setBackground(Color.WHITE);
+
+        // 标题
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+        card.add(titleLabel, BorderLayout.NORTH);
+
+        // 数值
+        JLabel valueLabel = new JLabel(value);
+        valueLabel.setFont(new Font("微软雅黑", Font.BOLD, 24));
+        valueLabel.setForeground(color);
+        valueLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        card.add(valueLabel, BorderLayout.CENTER);
+
+        return card;
+    }
+
+    // 修复：获取总员工数 - 从person表查询
+    private int getTotalEmployeeCount() {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        String sql = "SELECT COUNT(*) AS total FROM person";
+        int count = 0;
+        try {
+            conn = DBConnection.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                count = rs.getInt("total");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("获取总员工数出错: " + e.getMessage());
+        } finally {
+            closeResources(rs, pstmt, conn);
+        }
+        System.out.println("总员工数查询结果: " + count);
+        return count;
+    }
+
+    // 修复：获取部门总数 - 从department表查询
+    private int getDepartmentCount() {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        String sql = "SELECT COUNT(*) AS dept_count FROM department";
+        int count = 0;
+        try {
+            conn = DBConnection.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                count = rs.getInt("dept_count");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("获取部门总数出错: " + e.getMessage());
+            count = 0;
+        } finally {
+            closeResources(rs, pstmt, conn);
+        }
+        System.out.println("部门总数查询结果: " + count);
+        return count;
+    }
+
+    // 修复：获取在职员工数 - 从person表查询state='t'的记录
+    private int getActiveEmployeeCount() {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        String sql = "SELECT COUNT(*) AS active_count FROM person WHERE state = 't'";
+        int count = 0;
+        try {
+            conn = DBConnection.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                count = rs.getInt("active_count");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("获取在职员工数出错: " + e.getMessage());
+            count = 0;
+        } finally {
+            closeResources(rs, pstmt, conn);
+        }
+        System.out.println("在职员工数查询结果: " + count);
+        return count;
+    }
+
+    // 修复：获取人事变动数 - 从personnel表查询
+    private int getPersonnelChanges() {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        String sql = "SELECT COUNT(*) AS change_count FROM personnel";
+        int count = 0;
+        try {
+            conn = DBConnection.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                count = rs.getInt("change_count");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("获取人事变动数出错: " + e.getMessage());
+            count = 0;
+        } finally {
+            closeResources(rs, pstmt, conn);
+        }
+        System.out.println("人事变动数查询结果: " + count);
+        return count;
+    }
+
+    // 统一资源关闭方法
+    private void closeResources(ResultSet rs, PreparedStatement pstmt, Connection conn) {
+        try {
+            if (rs != null) rs.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            if (pstmt != null) pstmt.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            if (conn != null) DBConnection.closeConnection(conn);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}

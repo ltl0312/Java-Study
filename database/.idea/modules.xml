@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/database.iml" filepath="$PROJECT_DIR$/database.iml" />
+      <module fileurl="file://$PROJECT_DIR$/databasejdbc/databasejdbc.iml" filepath="$PROJECT_DIR$/databasejdbc/databasejdbc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/encryption/encryption.iml" filepath="$PROJECT_DIR$/encryption/encryption.iml" />
+      <module fileurl="file://$PROJECT_DIR$/login/login.iml" filepath="$PROJECT_DIR$/login/login.iml" />
+      <module fileurl="file://$PROJECT_DIR$/newemployee/newemployee.iml" filepath="$PROJECT_DIR$/newemployee/newemployee.iml" />
+      <module fileurl="file://$PROJECT_DIR$/personnelchange/personnelchange.iml" filepath="$PROJECT_DIR$/personnelchange/personnelchange.iml" />
+      <module fileurl="file://$PROJECT_DIR$/query and modification/query and modification.iml" filepath="$PROJECT_DIR$/query and modification/query and modification.iml" />
+    </modules>
+  </component>
+</project>

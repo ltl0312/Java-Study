@@ -1,0 +1,261 @@
+package com.pms.gui.dialogs;
+
+import com.pms.model.Employee;
+import com.pms.utils.DBConnection;
+import com.pms.utils.SwingUtil;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Date;
+
+public class EmployeeDialog extends JDialog {
+    private boolean confirmed = false;
+    private Employee employee;
+
+    // 新增：部门/职位/学历下拉框（存储CodeNameItem）
+    private JComboBox<CodeNameItem> departmentCombo = new JComboBox<>();
+    private JComboBox<CodeNameItem> jobCombo = new JComboBox<>();
+    private JComboBox<CodeNameItem> eduLevelCombo = new JComboBox<>();
+
+
+    // 其他字段保持不变（idField、nameField等）
+    private JTextField idField = new JTextField(15);
+    private JTextField nameField = new JTextField(15);
+    private JRadioButton maleRadio = new JRadioButton("男", true);
+    private JRadioButton femaleRadio = new JRadioButton("女");
+    private JTextField birthdayField = new JTextField(15);
+    private JTextField specialtyField = new JTextField(15);
+    private JTextField addressField = new JTextField(15);
+    private JTextField telField = new JTextField(15);
+    private JTextField emailField = new JTextField(15);
+    private JTextArea remarkArea = new JTextArea(3, 15);
+
+    public EmployeeDialog(Frame parent, String title, Employee emp) {
+        super(parent, title, true);
+        this.employee = emp;
+        initUI();
+        loadData(); // 加载部门/职位/学历数据
+        if (emp != null) {
+            loadEmployeeData(); // 编辑模式：回显数据
+        }
+        pack();
+        setLocationRelativeTo(parent);
+    }
+
+    private void initUI() {
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        // 1. 员工ID
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        formPanel.add(new JLabel("员工ID:"), gbc);
+        gbc.gridx = 1;
+        formPanel.add(idField, gbc);
+
+        // 2. 姓名
+        gbc.gridx = 0;
+        gbc.gridy++;
+        formPanel.add(new JLabel("姓名:"), gbc);
+        gbc.gridx = 1;
+        formPanel.add(nameField, gbc);
+
+        // 3. 性别
+        gbc.gridx = 0;
+        gbc.gridy++;
+        formPanel.add(new JLabel("性别:"), gbc);
+        gbc.gridx = 1;
+        JPanel sexPanel = new JPanel();
+        sexPanel.add(maleRadio);
+        sexPanel.add(femaleRadio);
+        ButtonGroup sexGroup = new ButtonGroup();
+        sexGroup.add(maleRadio);
+        sexGroup.add(femaleRadio);
+        formPanel.add(sexPanel, gbc);
+
+        // 4. 部门（下拉框，显示名称，存储代码）
+        gbc.gridx = 0;
+        gbc.gridy++;
+        formPanel.add(new JLabel("部门:"), gbc);
+        gbc.gridx = 1;
+        formPanel.add(departmentCombo, gbc);
+
+        // 5. 职位（下拉框，显示名称，存储代码）
+        gbc.gridx = 0;
+        gbc.gridy++;
+        formPanel.add(new JLabel("职位:"), gbc);
+        gbc.gridx = 1;
+        formPanel.add(jobCombo, gbc);
+
+        // 6. 学历（下拉框，显示名称，存储代码）
+        gbc.gridx = 0;
+        gbc.gridy++;
+        formPanel.add(new JLabel("学历:"), gbc);
+        gbc.gridx = 1;
+        formPanel.add(eduLevelCombo, gbc);
+
+        // 其他字段（生日、专业等）按原有逻辑添加...
+
+        // 按钮面板
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton okBtn = new JButton("确定");
+        JButton cancelBtn = new JButton("取消");
+        okBtn.addActionListener(this::confirmAction);
+        cancelBtn.addActionListener(e -> dispose());
+        btnPanel.add(okBtn);
+        btnPanel.add(cancelBtn);
+
+        mainPanel.add(formPanel, BorderLayout.CENTER);
+        mainPanel.add(btnPanel, BorderLayout.SOUTH);
+        add(mainPanel);
+    }
+
+    /**
+     * 加载部门、职位、学历数据（从数据库查询代码和名称）
+     */
+    private void loadData() {
+        // 加载部门（department.id 对应 部门代码）
+        String deptSql = "SELECT id, name FROM department";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(deptSql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                departmentCombo.addItem(new CodeNameItem(
+                        rs.getInt("id"),  // 部门代码（int）
+                        rs.getString("name")  // 部门名称
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "加载部门数据失败");
+        }
+
+        // 加载职位（job.code 对应 职位代码）
+        String jobSql = "SELECT code, description FROM job";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(jobSql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                jobCombo.addItem(new CodeNameItem(
+                        rs.getInt("code"),  // 职位代码（int）
+                        rs.getString("description")  // 职位名称
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "加载职位数据失败");
+        }
+
+        // 加载学历（edu_level.code 对应 学历代码）
+        String eduSql = "SELECT code, description FROM edu_level";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(eduSql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                eduLevelCombo.addItem(new CodeNameItem(
+                        rs.getInt("code"),  // 学历代码（int）
+                        rs.getString("description")  // 学历名称
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "加载学历数据失败");
+        }
+    }
+
+    /**
+     * 编辑模式：回显员工数据（设置下拉框选中状态）
+     */
+    private void loadEmployeeData() {
+        idField.setText(String.valueOf(employee.getId()));
+        idField.setEditable(true); // 编辑时ID可改
+        nameField.setText(employee.getName());
+        // 性别回显
+        if ("女".equals(employee.getSex())) {
+            femaleRadio.setSelected(true);
+        } else {
+            maleRadio.setSelected(true);
+        }
+
+        // 部门回显（根据代码选中对应项）
+        for (int i = 0; i < departmentCombo.getItemCount(); i++) {
+            CodeNameItem item = departmentCombo.getItemAt(i);
+            if (item.getCode() == employee.getDepartmentId()) {
+                departmentCombo.setSelectedIndex(i);
+                break;
+            }
+        }
+
+        // 职位回显
+        for (int i = 0; i < jobCombo.getItemCount(); i++) {
+            CodeNameItem item = jobCombo.getItemAt(i);
+            if (item.getCode() == employee.getJobCode()) {
+                jobCombo.setSelectedIndex(i);
+                break;
+            }
+        }
+
+        // 学历回显
+        for (int i = 0; i < eduLevelCombo.getItemCount(); i++) {
+            CodeNameItem item = eduLevelCombo.getItemAt(i);
+            if (item.getCode() == employee.getEduLevelCode()) {
+                eduLevelCombo.setSelectedIndex(i);
+                break;
+            }
+        }
+
+        // 电话回显
+
+
+        // 其他字段回显（生日、电话等）...
+    }
+
+    /**
+     * 确认按钮逻辑：封装员工数据（部门/职位/学历用int代码）
+     */
+    private void confirmAction(ActionEvent e) {
+        // 数据校验（省略）
+        if (employee == null) {
+            employee = new Employee();
+        }
+
+        // 基本信息
+        employee.setId(Integer.parseInt(idField.getText().trim()));
+        employee.setName(nameField.getText().trim());
+        employee.setSex(maleRadio.isSelected() ? "男" : "女");
+
+        // 核心修改：获取部门/职位/学历的int代码
+        CodeNameItem deptItem = (CodeNameItem) departmentCombo.getSelectedItem();
+        employee.setDepartmentId(deptItem.getCode()); // 部门代码（int）
+
+        CodeNameItem jobItem = (CodeNameItem) jobCombo.getSelectedItem();
+        employee.setJobCode(jobItem.getCode()); // 职位代码（int）
+
+        CodeNameItem eduItem = (CodeNameItem) eduLevelCombo.getSelectedItem();
+        employee.setEduLevelCode(eduItem.getCode()); // 学历代码（int）
+
+        // 其他字段设置（生日、电话等）...
+
+        confirmed = true;
+        dispose();
+    }
+
+    public boolean isConfirmed() {
+        return confirmed;
+    }
+
+    public Employee getEmployee() {
+        return employee;
+    }
+}
