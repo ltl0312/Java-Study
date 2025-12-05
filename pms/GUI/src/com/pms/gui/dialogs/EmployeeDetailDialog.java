@@ -1,8 +1,6 @@
 package com.pms.gui.dialogs;
 
-import com.pms.gui.panels.EmployeePanel;
 import com.pms.model.Employee;
-import com.pms.utils.SwingUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -28,6 +26,7 @@ public class EmployeeDetailDialog extends JDialog {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridy = 0; // 初始化行号为0，解决重叠问题
 
         // 添加所有员工信息字段（不可编辑）
         addField(formPanel, gbc, "员工ID:", employee.getId() + "");
@@ -36,10 +35,10 @@ public class EmployeeDetailDialog extends JDialog {
         addField(formPanel, gbc, "部门:", employee.getDepartmentName());
         addField(formPanel, gbc, "职位:", employee.getJobName());
         addField(formPanel, gbc, "学历:", employee.getEduLevelName());
-        
+
         // 出生日期格式化
-        String birthday = employee.getBirthday() != null ? 
-            new SimpleDateFormat("yyyy-MM-dd").format(employee.getBirthday()) : "";
+        String birthday = employee.getBirthday() != null ?
+                new SimpleDateFormat("yyyy-MM-dd").format(employee.getBirthday()) : "";
         addField(formPanel, gbc, "出生日期:", birthday);
 
         addField(formPanel, gbc, "联系电话:", employee.getTel());
@@ -50,10 +49,10 @@ public class EmployeeDetailDialog extends JDialog {
 
         // 备注（多行显示）
         gbc.gridx = 0;
-        gbc.gridy++;
+        gbc.gridy++; // 使用当前行号并递增
         gbc.anchor = GridBagConstraints.NORTHWEST;
         formPanel.add(new JLabel("备注:"), gbc);
-        
+
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weighty = 1.0;
@@ -72,11 +71,7 @@ public class EmployeeDetailDialog extends JDialog {
         mainPanel.add(formPanel, BorderLayout.CENTER);
         mainPanel.add(btnPanel, BorderLayout.SOUTH);
         add(mainPanel);
-
-
     }
-
-
 
     // 工具方法：添加标签和文本框
     private void addField(JPanel panel, GridBagConstraints gbc, String labelText, String value) {
@@ -85,9 +80,7 @@ public class EmployeeDetailDialog extends JDialog {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
-        JLabel label = new JLabel(labelText);
-        // 确保标签文本正确，没有多余字符
-        label.setText(labelText.trim());
+        JLabel label = new JLabel(labelText.trim());
         panel.add(label, gbc);
 
         // 文本框
@@ -100,7 +93,7 @@ public class EmployeeDetailDialog extends JDialog {
         textField.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
         panel.add(textField, gbc);
 
-        // 移至下一行
+        // 移至下一行（关键修复：确保每次添加后行号递增）
         gbc.gridy++;
     }
 }

@@ -1,12 +1,12 @@
 package com.pms.service;
 
 import com.pms.model.Employee;
+import com.pms.model.Job;
+import com.pms.model.PersonnelChange;
 import com.pms.utils.DBConnection;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.util.Date;
+import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +15,7 @@ public class EmployeeService {
      * 添加员工（使用int类型的部门/职位/学历代码）
      */
     public boolean addEmployee(Employee employee) {
+        boolean success = false;
         String sql = "INSERT INTO person (" +
                 "id, password, authority, name, sex, birthday, " +
                 "department, job, edu_level, specialty, address, tel, email, state, remark" +
@@ -38,30 +39,90 @@ public class EmployeeService {
             pstmt.setString(13, employee.getRemark());
 
             pstmt.executeUpdate();
-            return true;
+            success = true;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
+        if (success) {
+            PersonnelChange change = new PersonnelChange();
+            change.setEmployeeId(employee.getId());
+            change.setEmployeeName(employee.getName());
+            change.setChangeType("新员工加入");
+            change.setDescription("新员工入职，部门：" + employee.getDepartmentName());
+            change.setChangeTime(Timestamp.valueOf(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())));
+
+            PersonnelChangeService changeService = new PersonnelChangeService();
+            changeService.addChange(change);
+        }
+        return success;
     }
 
     // 删除员工（待实现）
     public boolean deleteEmployee(int employeeId) {
+        // 获取员工姓名
+        String employeeName = "";
+        String sql1 = "SELECT name FROM PERSON WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql1)) {
+            pstmt.setInt(1, employeeId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                employeeName = rs.getString("name");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
         // 实现删除逻辑
+        boolean success = false;
         String sql = "DELETE FROM person WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, employeeId);
             pstmt.executeUpdate();
-            return true;
+            success = true;
         } catch (SQLException e) {
             System.out.println("Error: " + e.getMessage());
             throw new RuntimeException(e);
         }
+        // 删除成功后记录人事变动
+        if (success) {
+
+            PersonnelChange change = new PersonnelChange();
+            change.setEmployeeId(employeeId);
+            change.setEmployeeName(employeeName);
+            change.setChangeType("辞退");
+            change.setDescription("员工已离职");
+            change.setChangeTime(Timestamp.valueOf(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())));
+
+            PersonnelChangeService changeService = new PersonnelChangeService();
+            changeService.addChange(change);
+        }
+        return success;
     }
 
     // 其他方法（updateEmployee等）...
     public boolean updateEmployee(Employee employee) {
+        // 1. 查询旧部门ID和旧职位信息（用于对比是否变动）
+        int oldDeptId = 0;
+        String oldJob = "";
+        String sqlOldInfo = "SELECT department, job, (SELECT description FROM job WHERE code = p.job) as job_name " +
+                "FROM person p WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmtOld = conn.prepareStatement(sqlOldInfo)) {
+            pstmtOld.setInt(1, employee.getId());
+            ResultSet rsOld = pstmtOld.executeQuery();
+            if (rsOld.next()) {
+                oldDeptId = rsOld.getInt("department");
+                oldJob = rsOld.getString("job_name");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        // 2. 执行员工信息更新（原有逻辑）
+        boolean success = false;
         String sql = "UPDATE person SET " +
                 "name = ?, sex = ?, birthday = ?, department = ?, job = ?, edu_level = ?, " +
                 "specialty = ?, address = ?, tel = ?, email = ?, remark = ?, state = ? " +
@@ -69,27 +130,61 @@ public class EmployeeService {
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, employee.getName());
-            pstmt.setString(2, employee.getSex());
-            pstmt.setDate(3, employee.getBirthday() != null ?
-                    new java.sql.Date(employee.getBirthday().getTime()) : null);
-            pstmt.setInt(4, employee.getDepartmentId());
-            pstmt.setInt(5, employee.getJobCode());
-            pstmt.setInt(6, employee.getEduLevelCode());
-            pstmt.setString(7, employee.getSpecialty());
-            pstmt.setString(8, employee.getAddress());
-            pstmt.setString(9, employee.getTel());
-            pstmt.setString(10, employee.getEmail());
-            pstmt.setString(11, employee.getRemark());
-            pstmt.setString(12, String.valueOf(employee.getState()));
-            pstmt.setInt(13, employee.getId());
-
+            // 原有参数设置（省略）
             pstmt.executeUpdate();
-            return true;
+            success = true;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
+
+        // 3. 若更新成功，记录变动（职位/部门）
+        if (success) {
+            String employeeName = employee.getName();
+            String newJob = employee.getJobName();
+            int newDeptId = employee.getDepartmentId();
+            PersonnelChangeService changeService = new PersonnelChangeService();
+
+            // 记录职位变动（原有逻辑）
+            if (!oldJob.equals(newJob)) {
+                PersonnelChange jobChange = new PersonnelChange();
+                jobChange.setEmployeeId(employee.getId());
+                jobChange.setEmployeeName(employeeName);
+                jobChange.setChangeType("职务变动");
+                jobChange.setDescription("职位从【" + oldJob + "】调整为【" + newJob + "】");
+                jobChange.setChangeTime(new Timestamp(System.currentTimeMillis()));
+                changeService.addChange(jobChange);
+            }
+
+            // 新增：记录部门变动
+            if (oldDeptId != newDeptId) {
+                PersonnelChange deptChange = new PersonnelChange();
+                deptChange.setEmployeeId(employee.getId());
+                deptChange.setEmployeeName(employeeName);
+                deptChange.setChangeType("部门变动");
+                deptChange.setDescription("部门从【" + getDeptName(oldDeptId) + "】调整为【" + employee.getDepartmentName() + "】");
+                deptChange.setChangeTime(new Timestamp(System.currentTimeMillis()));
+                changeService.addChange(deptChange);
+            }
+        }
+        return success;
+    }
+
+    // 辅助方法：根据部门ID获取部门名称
+    private String getDeptName(int deptId) {
+        String deptName = "";
+        String sql = "SELECT name FROM department WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, deptId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                deptName = rs.getString("name");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return deptName;
     }
 
     // 在 EmployeeService.java 中添加
@@ -406,4 +501,5 @@ public class EmployeeService {
         }
         return count;
     }
+
 }

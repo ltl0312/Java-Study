@@ -1,9 +1,9 @@
 package com.pms.gui.dialogs;
 
 import com.pms.model.Department;
+
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
 
 public class DepartmentDetailDialog extends JDialog {
     private Department department;
@@ -25,6 +25,7 @@ public class DepartmentDetailDialog extends JDialog {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridy = 0; // 初始化行号为0，解决重叠问题
 
         // 添加部门信息字段（不可编辑）
         addField(formPanel, gbc, "部门ID:", String.valueOf(department.getId()));
@@ -33,7 +34,7 @@ public class DepartmentDetailDialog extends JDialog {
 
         // 部门简介（多行显示）
         gbc.gridx = 0;
-        gbc.gridy++;
+        gbc.gridy++; // 使用当前行号并递增
         gbc.anchor = GridBagConstraints.NORTHWEST;
         formPanel.add(new JLabel("部门简介:"), gbc);
 
@@ -59,14 +60,23 @@ public class DepartmentDetailDialog extends JDialog {
 
     // 工具方法：添加字段到表单
     private void addField(JPanel panel, GridBagConstraints gbc, String label, String value) {
+        // 标签配置
         gbc.gridx = 0;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.weightx = 0;
         panel.add(new JLabel(label), gbc);
-        
+
+        // 文本框配置
         gbc.gridx = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
         JTextField field = new JTextField(value);
         field.setEditable(false);
         panel.add(field, gbc);
-        
+
+        // 移至下一行（关键修复：确保每次添加后行号递增）
         gbc.gridy++;
     }
 }

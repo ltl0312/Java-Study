@@ -3,6 +3,7 @@ package com.pms.gui.panels;
 import com.pms.gui.dialogs.DepartmentDetailDialog;
 import com.pms.gui.dialogs.DepartmentDialog;
 import com.pms.model.Department;
+import com.pms.service.DepartmentService;
 import com.pms.utils.DBConnection;
 import com.pms.utils.SwingUtil;
 import javax.swing.*;
@@ -108,7 +109,8 @@ public class DepartmentPanel extends JPanel {
                     if (row != -1) {
                         int modelRow = departmentTable.convertRowIndexToModel(row);
                         int deptId = (int) tableModel.getValueAt(modelRow, 0);
-                        Department dept = getDepartmentById(deptId);
+                        DepartmentService service = new DepartmentService();
+                        Department dept = service.getDepartmentById(deptId);
                         if (dept != null) {
                             new DepartmentDetailDialog(SwingUtil.getParentFrame(DepartmentPanel.this),
                                     "部门详情", dept).setVisible(true);
@@ -253,16 +255,24 @@ public class DepartmentPanel extends JPanel {
         updatePageInfo();
     }
 
-    // 添加部门
+    // 修改添加部门方法，调用服务层
     private void addDepartment(ActionEvent e) {
         DepartmentDialog dialog = new DepartmentDialog(SwingUtil.getParentFrame(this), "添加部门", null);
         dialog.setVisible(true);
         if (dialog.isConfirmed()) {
-            loadDepartmentData();
+            DepartmentService service = new DepartmentService();
+            boolean success = service.addDepartment(dialog.getDepartment());
+            if (success) {
+                JOptionPane.showMessageDialog(this, "添加成功");
+                loadDepartmentData(); // 刷新表格
+            } else {
+                JOptionPane.showMessageDialog(this, "添加失败，可能是ID已存在", "错误", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
-    // 编辑部门（已有方法，保持不变）
+    // 编辑部门
+    // 直接在editDepartment方法中内联调用，简化逻辑：
     private void editDepartment(ActionEvent e) {
         int selectedRow = departmentTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -270,18 +280,35 @@ public class DepartmentPanel extends JPanel {
             return;
         }
 
-        int deptId = (int) departmentTable.getValueAt(selectedRow, 0);
-        Department dept = new Department(
-                deptId,
-                (String) departmentTable.getValueAt(selectedRow, 1),
-                (String) departmentTable.getValueAt(selectedRow, 2),
-                (String) departmentTable.getValueAt(selectedRow, 3)
-        );
+        // 获取选中部门的ID（修复行索引转换，避免模型与视图行号不一致）
+        int modelRow = departmentTable.convertRowIndexToModel(selectedRow);
+        Integer deptId = (Integer) tableModel.getValueAt(modelRow, 0);
+        if (deptId == null) {
+            JOptionPane.showMessageDialog(this, "部门ID为空，无法编辑", "错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
+        // 直接调用Service查询，无冗余封装
+        DepartmentService service = new DepartmentService();
+        Department dept = service.getDepartmentById(deptId); // 这里调用修复后的方法，无递归
+        if (dept == null) {
+            JOptionPane.showMessageDialog(this, "部门数据不存在", "错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // 显示编辑对话框
         DepartmentDialog dialog = new DepartmentDialog(SwingUtil.getParentFrame(this), "编辑部门", dept);
         dialog.setVisible(true);
+
+        // 确认修改后更新数据
         if (dialog.isConfirmed()) {
-            loadDepartmentData();
+            boolean success = service.updateDepartment(dialog.getDepartment());
+            if (success) {
+                JOptionPane.showMessageDialog(this, "修改成功");
+                loadDepartmentData(); // 刷新表格
+            } else {
+                JOptionPane.showMessageDialog(this, "修改失败", "错误", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
@@ -293,48 +320,31 @@ public class DepartmentPanel extends JPanel {
             return;
         }
 
-        int deptId = (int) departmentTable.getValueAt(selectedRow, 0);
-        String deptName = (String) departmentTable.getValueAt(selectedRow, 1);
+        // 获取选中部门的ID和名称
+        int modelRow = departmentTable.convertRowIndexToModel(selectedRow);
+        int deptId = (int) tableModel.getValueAt(modelRow, 0);
+        String deptName = (String) tableModel.getValueAt(modelRow, 1);
 
-        if (JOptionPane.showConfirmDialog(this,
-                "确定要删除部门[" + deptName + "]吗？", "确认删除",
-                JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
-            return;
-        }
+        // 确认删除
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "确定要删除部门【" + deptName + "】吗？\n删除后相关数据将无法恢复",
+                "确认删除",
+                JOptionPane.YES_NO_OPTION
+        );
 
-        String sql = "DELETE FROM department WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, deptId);
-            pstmt.executeUpdate();
-            JOptionPane.showMessageDialog(this, "删除成功");
-            loadDepartmentData();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "删除失败: " + ex.getMessage());
+        if (confirm == JOptionPane.YES_OPTION) {
+            DepartmentService service = new DepartmentService();
+            boolean success = service.deleteDepartment(deptId);
+            if (success) {
+                JOptionPane.showMessageDialog(this, "删除成功");
+                loadDepartmentData(); // 刷新表格
+            }
         }
     }
 
     // 获取部门详情
-    private Department getDepartmentById(int id) {
-        String sql = "SELECT id, name, manager, intro FROM department WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, id);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return new Department(
-                        rs.getInt("id"),
-                        rs.getString("name"),
-                        rs.getString("manager"),
-                        rs.getString("intro")
-                );
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
+
 
     // 更新分页信息
     private void updatePageInfo() {

@@ -1,7 +1,10 @@
 package com.pms.gui.panels;
 
 import com.pms.gui.dialogs.PersonnelChangeDialog;
+import com.pms.model.Employee;
 import com.pms.model.PersonnelChange;
+import com.pms.service.EmployeeService;
+import com.pms.service.PersonnelChangeService;
 import com.pms.utils.DBConnection;
 import com.pms.utils.SwingUtil;
 import javax.swing.*;
@@ -10,9 +13,12 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -168,23 +174,22 @@ public class PersonnelChangePanel extends JPanel {
     }
 
     // 从数据库获取变动记录（核心修正：适配通用表结构，解决字段不存在问题）
+    // 从数据库获取变动记录（修正版）
     private List<PersonnelChange> getChangesFromDB() {
         List<PersonnelChange> changes = new ArrayList<>();
-        // 排序字段映射：仅适配记录ID(0)、员工ID(1)，避免时间字段错误
-        String[] sortFields = {"p.id", "p.person", "", "", "", ""};
+        // 排序字段映射：适配数据库字段
+        String[] sortFields = {"p.id", "p.person", "pe.name", "pc.description", "p.description", "p.change_time"};
         String sortField = sortFields[sortColumn];
         String order = ascending ? "ASC" : "DESC";
         int offset = (currentPage - 1) * pageSize;
 
-        // 修正1：移除错误的change_code关联，改用原始的`change`字段（反引号转义关键字）
-        // 修正2：暂时注释变动时间字段，先保证基础查询运行（后续根据你的表结构替换）
+        // 修正：正确关联表并获取所有字段
         String countSql = "SELECT COUNT(*) FROM personnel p " +
                 "LEFT JOIN person pe ON p.person = pe.id " +
                 "LEFT JOIN personnel_change pc ON p.`change` = pc.code";
 
-        // 修正3：SQL语句适配通用结构，字段名用反引号转义关键字，暂时隐藏时间字段
         String dataSql = String.format(
-                "SELECT p.id, p.person, pe.name, pc.description, p.description, '' " +
+                "SELECT p.id, p.person, pe.name, pc.description, p.description, p.change_time " +
                         "FROM personnel p " +
                         "LEFT JOIN person pe ON p.person = pe.id " +
                         "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
@@ -208,9 +213,9 @@ public class PersonnelChangePanel extends JPanel {
                 change.setId(rs.getInt(1));                  // 记录ID
                 change.setEmployeeId(rs.getInt(2));          // 员工ID
                 change.setEmployeeName(rs.getString(3));     // 员工姓名
-                change.setChangeType(rs.getString(4));       // 变动类型
+                change.setChangeType(rs.getString(4));       // 变动类型（从personnel_change表获取）
                 change.setDescription(rs.getString(5));      // 变动描述
-                change.setChangeTime(rs.getString(6));       // 变动时间（暂时为空，后续替换）
+                change.setChangeTime(rs.getTimestamp(6));    // 变动时间（包含时分）
                 changes.add(change);
             }
         } catch (Exception e) {
@@ -220,25 +225,26 @@ public class PersonnelChangePanel extends JPanel {
         return changes;
     }
 
-    // 搜索变动记录（同步修正关联字段）
+    // 搜索变动记录
     private void searchChanges(ActionEvent e) {
         String keyword = searchField.getText().trim();
         tableModel.setRowCount(0);
-        // 修正：使用反引号转义`change`关键字，适配通用结构
-        String sql = "SELECT p.id, p.person, pe.name, pc.description, p.description, '' " +
+        String sql = "SELECT p.id, p.person, pe.name, pc.description, p.description, p.change_time " +
                 "FROM personnel p " +
                 "LEFT JOIN person pe ON p.person = pe.id " +
                 "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
-                "WHERE pe.name LIKE ? OR p.person = ?";
+                "WHERE pe.name LIKE ? OR p.person = ? OR pc.description LIKE ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, "%" + keyword + "%");
+            String likeKeyword = "%" + keyword + "%";
+            pstmt.setString(1, likeKeyword); // 搜索员工姓名
             try {
-                pstmt.setInt(2, Integer.parseInt(keyword));
+                pstmt.setInt(2, Integer.parseInt(keyword)); // 搜索员工ID
             } catch (NumberFormatException ex) {
-                pstmt.setInt(2, -1); // 无效ID查询
+                pstmt.setInt(2, -1); // 无效ID，不匹配
             }
+            pstmt.setString(3, likeKeyword); // 搜索变动类型
 
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -248,50 +254,124 @@ public class PersonnelChangePanel extends JPanel {
                         rs.getString(3),
                         rs.getString(4),
                         rs.getString(5),
-                        rs.getString(6)
+                        rs.getTimestamp(6)
                 });
             }
         } catch (Exception ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "搜索失败: " + ex.getMessage());
         }
-        updatePageInfo();
     }
 
     // 添加变动记录
     private void addChangeRecord(ActionEvent e) {
-        PersonnelChangeDialog dialog = new PersonnelChangeDialog(SwingUtil.getParentFrame(this), "添加人事变动记录");
-        dialog.setVisible(true);
-        if (dialog.isConfirmed()) {
-            loadChangeData();
+        // 1. 打开对话框获取用户输入的变动信息（假设已有对话框返回变动对象）
+        PersonnelChange change = showAddChangeDialog(); // 自定义方法，返回用户输入的变动信息
+        if (change == null) return;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false); // 开启事务（确保变动记录和员工更新同时成功/失败）
+            // 2. 添加人事变动记录
+            PersonnelChangeService changeService = new PersonnelChangeService();
+            System.out.println(changeService.getClass().getDeclaredMethods()); // 打印所有方法
+            System.out.println(changeService.getClass().getDeclaredFields());  // 打印所有属性
+            boolean isChangeAdded = changeService.addChange(change);
+            if (!isChangeAdded) {
+                throw new SQLException("添加变动记录失败");
+            }
+
+            // 3. 根据变动类型更新员工信息
+            EmployeeService empService = new EmployeeService();
+            Employee employee = empService.getEmployeeById(change.getEmployeeId()); // 需实现该方法
+            if (employee == null) {
+                throw new SQLException("未找到ID为" + change.getEmployeeId() + "的员工");
+            }
+
+            switch (change.getChangeType()) {
+                case "辞退":
+                    // 辞退→更新员工状态为“非在职”
+                    employee.setState('f');
+                    empService.updateEmployee(employee);
+                    break;
+                case "职务变动":
+                    // 职务变动→更新员工职位代码
+                    employee.setJobCode(change.getNewJobCode());
+                    empService.updateEmployee(employee);
+                    break;
+                case "部门变动":
+                    // 部门变动→更新员工部门ID
+                    employee.setDepartmentId(change.getNewDepartmentId());
+                    empService.updateEmployee(employee);
+                    break;
+                // 其他变动类型（如“新员工加入”一般通过员工添加界面触发，此处可忽略）
+            }
+
+            conn.commit(); // 事务提交
+            JOptionPane.showMessageDialog(this, "变动记录添加成功，员工信息已同步更新");
+            loadChangeData(); // 刷新变动列表
+        } catch (SQLException ex) {
+            if (conn != null) try { conn.rollback(); } catch (SQLException e1) {e1.printStackTrace();} // 事务回滚
+            ex.printStackTrace();
+
+            JOptionPane.showMessageDialog(this, "操作失败：" + ex.getMessage());
+
+        } finally {
+            if (conn != null) try { conn.close(); } catch (SQLException e1) {e1.printStackTrace();}
         }
     }
+
+    // 辅助方法：打开对话框获取变动信息（示例）
+    private PersonnelChange showAddChangeDialog() {
+        // 创建并显示人事变动对话框
+        PersonnelChangeDialog dialog = new PersonnelChangeDialog(
+                SwingUtil.getParentFrame(this),
+                "添加人事变动记录"
+        );
+
+        // 显示模态对话框
+        dialog.setVisible(true);
+
+        // 如果用户点击了确认按钮，返回输入的数据
+        if (dialog.isConfirmed()) {
+            return dialog.getPersonnelChange();
+        }
+
+        // 用户取消操作，返回null
+        return null;
+    }
+
 
     // 删除变动记录
     private void deleteChangeRecord(ActionEvent e) {
         int selectedRow = changeTable.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "请选择要删除的记录", "提示", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "请先选择要删除的记录", "提示", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
-        int recordId = (int) changeTable.getValueAt(selectedRow, 0);
-        if (JOptionPane.showConfirmDialog(this,
-                "确定要删除ID为" + recordId + "的变动记录吗？", "确认删除",
-                JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+        // 获取选中记录的ID
+        int modelRow = changeTable.convertRowIndexToModel(selectedRow);
+        int changeId = (int) tableModel.getValueAt(modelRow, 0);
+
+        // 确认删除
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "确定要删除ID为" + changeId + "的记录吗？",
+                "确认删除",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (confirm != JOptionPane.YES_OPTION) {
             return;
         }
 
-        String sql = "DELETE FROM personnel WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, recordId);
-            pstmt.executeUpdate();
+        // 调用服务层删除
+        PersonnelChangeService service = new PersonnelChangeService();
+        if (service.deleteChange(changeId)) {
             JOptionPane.showMessageDialog(this, "删除成功");
-            loadChangeData();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "删除失败: " + ex.getMessage());
+            loadChangeData(); // 刷新数据
+        } else {
+            JOptionPane.showMessageDialog(this, "删除失败", "错误", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -302,4 +382,5 @@ public class PersonnelChangePanel extends JPanel {
         prevBtn.setEnabled(currentPage > 1);
         nextBtn.setEnabled(currentPage < totalPages);
     }
+
 }

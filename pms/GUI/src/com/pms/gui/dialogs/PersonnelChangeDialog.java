@@ -4,6 +4,7 @@ import com.pms.model.PersonnelChange;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -37,15 +38,6 @@ public class PersonnelChangeDialog extends JDialog {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // 记录ID
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        formPanel.add(new JLabel("记录ID:"), gbc);
-
-        gbc.gridx = 1;
-        idField = new JTextField(15);
-        formPanel.add(idField, gbc);
-
         // 员工ID
         gbc.gridx = 0;
         gbc.gridy++;
@@ -70,8 +62,7 @@ public class PersonnelChangeDialog extends JDialog {
         formPanel.add(new JLabel("变动类型:"), gbc);
 
         gbc.gridx = 1;
-        changeTypeCombo = new JComboBox<>(new String[]{"新员工加入", "职务变动", "辞退"});
-        formPanel.add(changeTypeCombo, gbc);
+        changeTypeCombo = new JComboBox<>(new String[]{"新员工加入", "职务变动", "部门变动", "辞退"});        formPanel.add(changeTypeCombo, gbc);
 
         // 变动时间
         gbc.gridx = 0;
@@ -115,24 +106,46 @@ public class PersonnelChangeDialog extends JDialog {
 
     private void confirmAction(ActionEvent e) {
         // 数据验证
-        if (idField.getText().trim().isEmpty() || employeeIdField.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "记录ID和员工ID不能为空", "错误", JOptionPane.ERROR_MESSAGE);
+        if (employeeIdField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "员工ID不能为空", "错误", JOptionPane.ERROR_MESSAGE);
             return;
         }
+
+        if (timeField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "变动时间不能为空", "错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // 在EmployeeID校验后添加
+        String changeType = (String) changeTypeCombo.getSelectedItem();
+        if (changeType == null || changeType.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "请选择变动类型", "错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
 
         // 保存数据
         try {
-            change.setId(Integer.parseInt(idField.getText().trim()));
             change.setEmployeeId(Integer.parseInt(employeeIdField.getText().trim()));
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "ID必须是数字", "错误", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "员工ID必须是数字", "错误", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
+        // 处理时间格式（支持yyyy-MM-dd HH:mm）
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            Date utilDate = sdf.parse(timeField.getText().trim());
+            change.setChangeTime(new java.sql.Timestamp(utilDate.getTime()));
+        } catch (ParseException ex) {
+            JOptionPane.showMessageDialog(this, "时间格式错误（正确格式：yyyy-MM-dd HH:mm）", "错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // 设置其他字段
         change.setEmployeeName(employeeNameField.getText().trim());
         change.setChangeType((String) changeTypeCombo.getSelectedItem());
         change.setDescription(descriptionArea.getText().trim());
-
 
         confirmed = true;
         dispose();

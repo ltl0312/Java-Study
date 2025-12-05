@@ -1,21 +1,48 @@
 package com.pms.model;
 
+import java.sql.Date;
+import java.sql.Timestamp;
+
 public class PersonnelChange {
     private int id;
-    private int Employeeid;
-    private String Employeename;
+    private int EmployeeId;
+    private String EmployeeName;
     private String changeType;
     private String description;
-    private String changeTime;
+    private Timestamp changeTime;
+    private int oldDepartmentId; // 仅用于调岗
+    private int newDepartmentId; // 仅用于调岗
+    private int oldJobCode; // 仅用于调岗
+    private int newJobCode; // 仅用于调岗
 
     public PersonnelChange() {
     }
     public PersonnelChange(int id, int employeeid, String name, String change, String description) {
         this.id = id;
-        this.Employeeid = employeeid;
-        this.Employeename = name;
+        this.EmployeeId = employeeid;
+        this.EmployeeName = name;
         this.changeType = change;
         this.description = description;
+    }
+    public PersonnelChange(int employeeId, String employeeName, String changeType,
+                           String description, Timestamp changeTime) {
+        this.EmployeeId = employeeId;
+        this.EmployeeName = employeeName;
+        this.changeType = changeType;
+        this.description = description;
+        this.changeTime = changeTime;
+    }
+
+    // 调岗专用构造方法
+    public PersonnelChange(int employeeId, String employeeName, String changeType,
+                           String description, Timestamp changeTime,
+                           int oldDepartmentId, int newDepartmentId,
+                           int oldJobCode, int newJobCode) {
+        this(employeeId, employeeName, changeType, description, changeTime);
+        this.oldDepartmentId = oldDepartmentId;
+        this.newDepartmentId = newDepartmentId;
+        this.oldJobCode = oldJobCode;
+        this.newJobCode = newJobCode;
     }
 
     public int getId() {
@@ -27,19 +54,19 @@ public class PersonnelChange {
     }
 
     public int getEmployeeId() {
-        return Employeeid;
+        return EmployeeId;
     }
 
     public void setEmployeeId(int id) {
-        this.Employeeid = id;
+        this.EmployeeId = id;
     }
 
     public String getEmployeeName() {
-        return Employeename;
+        return EmployeeName;
     }
 
     public void setEmployeeName(String name) {
-        this.Employeename = name;
+        this.EmployeeName = name;
     }
 
     public String getChangeType() {
@@ -58,10 +85,44 @@ public class PersonnelChange {
         this.description = description;
     }
 
-    public String getChangeTime() {
+    public Timestamp getChangeTime() {
         return changeTime;
     }
-    public void setChangeTime(String changeTime) {
+    public void setChangeTime(Timestamp changeTime) {
         this.changeTime = changeTime;
     }
+
+    public int getOldDepartmentId() {
+        return oldDepartmentId;
+    }
+
+    public void setOldDepartmentId(int oldDepartmentId) {
+        this.oldDepartmentId = oldDepartmentId;
+    }
+
+    public int getNewDepartmentId() {
+        return newDepartmentId;
+    }
+
+    public void setNewDepartmentId(int newDepartmentId) {
+        this.newDepartmentId = newDepartmentId;
+    }
+
+    public int getOldJobCode() {
+        return oldJobCode;
+    }
+
+    public void setOldJobCode(int oldJobCode) {
+        this.oldJobCode = oldJobCode;
+    }
+
+    public int getNewJobCode() {
+        return newJobCode;
+    }
+
+    public void setNewJobCode(int newJobCode) {
+        this.newJobCode = newJobCode;
+    }
+
 }
+
