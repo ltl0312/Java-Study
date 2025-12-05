@@ -58,6 +58,9 @@ public class PersonnelChange {
         this.description = description;
     }
 
+    public String getChangeTime() {
+        return changeTime;
+    }
     public void setChangeTime(String changeTime) {
         this.changeTime = changeTime;
     }
