@@ -16,31 +16,75 @@ public class DashboardPanel extends JPanel {
         initUI();
     }
 
+    // 修改initUI()方法中的布局和间距
     private void initUI() {
         setLayout(new BorderLayout());
 
-        // 顶部标题
+        // 顶部标题优化
         JLabel titleLabel = new JLabel("系统概览", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 20));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 24));
+        titleLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY),
+                BorderFactory.createEmptyBorder(15, 0, 15, 0)
+        ));
+        titleLabel.setBackground(new Color(245, 245, 245));
+        titleLabel.setOpaque(true);
         add(titleLabel, BorderLayout.NORTH);
 
-        // 统计卡片面板
-        JPanel statsPanel = new JPanel(new GridLayout(2, 2, 20, 20));
-        statsPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
+        // 统计卡片面板优化
+        JPanel statsPanel = new JPanel(new GridLayout(2, 2, 15, 15));
+        statsPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        statsPanel.setBackground(new Color(249, 249, 249)); // 浅灰背景
 
-        // 添加统计卡片
-        statsPanel.add(createStatCard("总员工数", getTotalEmployeeCount() + " 人", Color.decode("#4CAF50")));
-        statsPanel.add(createStatCard("部门总数", getDepartmentCount() + " 个", Color.decode("#2196F3")));
-        statsPanel.add(createStatCard("在职员工", getActiveEmployeeCount() + " 人", Color.decode("#FF9800")));
-        statsPanel.add(createStatCard("人事变动", getPersonnelChanges() + " 条", Color.decode("#F44336")));
+        // 添加统计卡片（使用新的配色方案）
+        statsPanel.add(createStatCard("总员工数", getTotalEmployeeCount() + " 人",
+                new Color(76, 175, 80), new Color(232, 245, 233)));
+        statsPanel.add(createStatCard("部门总数", getDepartmentCount() + " 个",
+                new Color(33, 150, 243), new Color(227, 242, 253)));
+        statsPanel.add(createStatCard("在职员工", getActiveEmployeeCount() + " 人",
+                new Color(255, 152, 0), new Color(255, 248, 225)));
+        statsPanel.add(createStatCard("人事变动", getPersonnelChanges() + " 条",
+                new Color(244, 67, 54), new Color(255, 235, 238)));
 
         add(statsPanel, BorderLayout.CENTER);
 
-        // 底部信息
+        // 底部信息优化
         JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        footerPanel.add(new JLabel("数据更新时间: " + java.time.LocalDateTime.now().toString().substring(0, 16)));
+        footerPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 15));
+        footerPanel.setBackground(new Color(245, 245, 245));
+        JLabel timeLabel = new JLabel("数据更新时间: " +
+                java.time.LocalDateTime.now().toString().substring(0, 16));
+        timeLabel.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        timeLabel.setForeground(new Color(102, 102, 102));
+        footerPanel.add(timeLabel);
         add(footerPanel, BorderLayout.SOUTH);
+    }
+
+    // 修改createStatCard方法，增加卡片视觉效果
+    private JPanel createStatCard(String title, String value, Color valueColor, Color bgColor) {
+        JPanel card = new JPanel(new BorderLayout());
+        // 卡片阴影和边框效果
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        card.setBackground(bgColor); // 卡片背景色
+        card.setPreferredSize(new Dimension(0, 120)); // 固定卡片高度
+
+        // 标题
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("微软雅黑", Font.PLAIN, 16));
+        titleLabel.setForeground(new Color(102, 102, 102));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        card.add(titleLabel, BorderLayout.NORTH);
+
+        // 数值
+        JLabel valueLabel = new JLabel(value);
+        valueLabel.setFont(new Font("微软雅黑", Font.BOLD, 28));
+        valueLabel.setForeground(valueColor);
+        card.add(valueLabel, BorderLayout.CENTER);
+
+        return card;
     }
 
     /**

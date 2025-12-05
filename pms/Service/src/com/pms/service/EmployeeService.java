@@ -167,10 +167,14 @@ public class EmployeeService {
         return employees;
     }
 
-    public int getEmployeeCountByCondition(String keyword, int deptId, int jobCode, String state) {
-        int count = 0;
+
+    // 修改EmployeeService中的getEmployeesByCondition方法，添加排序参数
+    public List<Employee> getEmployeesByCondition(String keyword, int deptId, int jobCode,
+                                                  String state, int offset, int pageSize,
+                                                  String sortField, String sortDirection) {
+        List<Employee> employees = new ArrayList<>();
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT COUNT(*) as total ");
+        sql.append("SELECT p.*, d.name as dept_name, j.description as job_name ");
         sql.append("FROM person p ");
         sql.append("LEFT JOIN department d ON p.department = d.id ");
         sql.append("LEFT JOIN job j ON p.job = j.code ");
@@ -178,7 +182,189 @@ public class EmployeeService {
 
         List<Object> params = new ArrayList<>();
 
-        // 添加搜索条件（与上面方法相同）
+        // 添加搜索条件（保持不变）
+        if (keyword != null && !keyword.isEmpty()) {
+            sql.append("AND (p.id LIKE ? OR p.name LIKE ? OR p.sex LIKE ? ");
+            sql.append("OR p.tel LIKE ? OR p.email LIKE ? OR p.address LIKE ? ");
+            sql.append("OR d.name LIKE ? OR j.description LIKE ?) ");
+            String likeKeyword = "%" + keyword + "%";
+            for (int i = 0; i < 8; i++) {
+                params.add(likeKeyword);
+            }
+        }
+
+        // 部门筛选（保持不变）
+        if (deptId != -1) {
+            sql.append("AND p.department = ? ");
+            params.add(deptId);
+        }
+
+        // 职位筛选（保持不变）
+        if (jobCode != -1) {
+            sql.append("AND p.job = ? ");
+            params.add(jobCode);
+        }
+
+        // 状态筛选（保持不变）
+        if (state != null && !state.isEmpty() && !"全部".equals(state)) {
+            sql.append("AND p.state = ? ");
+            params.add("在职".equals(state) ? "t" : "f");
+        }
+
+        // 添加排序条件
+        sql.append("ORDER BY ").append(sortField).append(" ").append(sortDirection).append(" ");
+
+        // 分页（保持不变）
+        sql.append("LIMIT ? OFFSET ?");
+        params.add(pageSize);
+        params.add(offset);
+
+        // 执行查询（保持不变）
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Employee emp = new Employee();
+                emp.setId(rs.getInt("id"));
+                emp.setName(rs.getString("name"));
+                emp.setSex(rs.getString("sex"));
+                emp.setDepartmentId(rs.getInt("department"));
+                emp.setDepartmentName(rs.getString("dept_name"));
+                emp.setJobCode(rs.getInt("job"));
+                emp.setJobName(rs.getString("job_name"));
+                emp.setTel(rs.getString("tel"));
+                emp.setState(rs.getString("state").charAt(0));
+                employees.add(emp);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return employees;
+    }
+
+    // 在 EmployeeService.java 中添加如下方法
+    /**
+     * 根据条件查询员工总记录数（修复表名错误）
+     */
+    public int getEmployeeCountByCondition(String keyword, int deptId, int jobCode, String state) {
+        int count = 0;
+        StringBuilder sql = new StringBuilder();
+        // 关键修复：表名改为person（原错误可能写了employee），并保持关联表别名一致
+        sql.append("SELECT COUNT(*) FROM person p ");
+        sql.append("LEFT JOIN department d ON p.department = d.id ");
+        sql.append("LEFT JOIN job j ON p.job = j.code ");
+        sql.append("WHERE 1=1 ");
+
+        List<Object> params = new ArrayList<>();
+
+        // 搜索条件（与查询数据的逻辑保持一致）
+        if (keyword != null && !keyword.isEmpty()) {
+            sql.append("AND (p.id LIKE ? OR p.name LIKE ? OR p.sex LIKE ? ");
+            sql.append("OR p.tel LIKE ? OR p.email LIKE ? OR p.address LIKE ? ");
+            sql.append("OR d.name LIKE ? OR j.description LIKE ?) ");
+            String likeKeyword = "%" + keyword + "%";
+            for (int i = 0; i < 8; i++) {
+                params.add(likeKeyword);
+            }
+        }
+
+        // 部门筛选
+        if (deptId != -1) {
+            sql.append("AND p.department = ? ");
+            params.add(deptId);
+        }
+
+        // 职位筛选
+        if (jobCode != -1) {
+            sql.append("AND p.job = ? ");
+            params.add(jobCode);
+        }
+
+        // 状态筛选（匹配person表的state字段）
+        if (state != null && !state.isEmpty() && !"全部".equals(state)) {
+            sql.append("AND p.state = ? ");
+            // 注意：数据库中state字段是char类型（t=在职，f=离职），需转换
+            params.add("在职".equals(state) ? "t" : "f");
+        }
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+
+            // 绑定参数
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                count = rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.out.println("查询员工总数失败：" + e.getMessage());
+        }
+        return count;
+    }
+
+
+    public Employee getEmployeeById(int employeeId) {
+        Employee emp = null;
+        String sql = "SELECT p.*, d.name as dept_name, j.description as job_name " +
+                "FROM person p " +
+                "LEFT JOIN department d ON p.department = d.id " +
+                "LEFT JOIN job j ON p.job = j.code " +
+                "WHERE p.id = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, employeeId);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                emp = new Employee();
+                emp.setId(rs.getInt("id"));
+                emp.setName(rs.getString("name"));
+                emp.setPassword(rs.getString("password"));
+                emp.setAuthority(rs.getString("authority"));
+                emp.setSex(rs.getString("sex"));
+                emp.setBirthday(rs.getDate("birthday"));
+                emp.setAddress(rs.getString("address"));
+                emp.setTel(rs.getString("tel"));
+                emp.setEmail(rs.getString("email"));
+                emp.setRemark(rs.getString("remark"));
+                emp.setDepartmentId(rs.getInt("department"));
+                emp.setDepartmentName(rs.getString("dept_name"));
+                emp.setJobCode(rs.getInt("job"));
+                emp.setJobName(rs.getString("job_name"));
+                emp.setEduLevelCode(rs.getInt("edu_level"));
+                emp.setSpecialty(rs.getString("specialty"));
+                emp.setState(rs.getString("state").charAt(0));
+                emp.setAuthority(rs.getString("authority"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return emp;
+    }
+
+    // 获取员工数量
+    public int getEmployeeCount(String keyword, int deptId, int jobCode, String state) {
+        int count = 0;
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(*) FROM person p ");
+        sql.append("LEFT JOIN department d ON p.department = d.id ");
+        sql.append("LEFT JOIN job j ON p.job = j.code ");
+        sql.append("WHERE 1=1 ");
+
+        List<Object> params = new ArrayList<>();
+
+        // 添加搜索条件（与getEmployeesByCondition方法相同）
         if (keyword != null && !keyword.isEmpty()) {
             sql.append("AND (p.id LIKE ? OR p.name LIKE ? OR p.sex LIKE ? ");
             sql.append("OR p.tel LIKE ? OR p.email LIKE ? OR p.address LIKE ? ");
@@ -213,7 +399,7 @@ public class EmployeeService {
 
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                count = rs.getInt("total");
+                count = rs.getInt(1);
             }
         } catch (SQLException e) {
             e.printStackTrace();

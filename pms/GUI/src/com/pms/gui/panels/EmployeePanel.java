@@ -1,7 +1,9 @@
+// 修改 EmployeePanel.java
 package com.pms.gui.panels;
 
 import com.pms.gui.dialogs.EmployeeDetailDialog;
 import com.pms.gui.dialogs.EmployeeDialog;
+import com.pms.model.CodeNameItem;
 import com.pms.model.Employee;
 import com.pms.service.EmployeeService;
 import com.pms.utils.DBConnection;
@@ -10,11 +12,14 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class EmployeePanel extends JPanel {
@@ -22,8 +27,27 @@ public class EmployeePanel extends JPanel {
     private DefaultTableModel tableModel;
     private JTextField searchField;
 
+    // 当前排序列索引
+    private int sortColumn = 0; // 当前排序列索引，默认ID列
+    private boolean ascending = true; // 排序方向，默认正序
+
+    // 新增分页相关组件和变量
+    private int currentPage = 1;
+    private final int pageSize = 15;// 每页显示的记录数
+    private int totalRecords = 0;
+    private JLabel pageInfoLabel;
+    private JButton prevBtn;
+    private JButton nextBtn;
+
+    // 新增筛选下拉框
+    private JComboBox<CodeNameItem> departmentCombo;
+    private JComboBox<CodeNameItem> jobCombo;
+    private JComboBox<String> stateCombo;
+
+
     public EmployeePanel() {
         initUI();
+        loadFilterData(); // 加载筛选数据
         loadEmployeeData(); // 加载员工数据
     }
 
@@ -33,7 +57,27 @@ public class EmployeePanel extends JPanel {
         // 创建顶部工具栏
         JPanel toolPanel = new JPanel(new BorderLayout());
 
-        // 搜索框
+        // 新增筛选面板
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        filterPanel.add(new JLabel("部门:"));
+        departmentCombo = new JComboBox<>();
+        departmentCombo.addItem(new CodeNameItem(-1, "全部"));
+        filterPanel.add(departmentCombo);
+
+        filterPanel.add(new JLabel("职位:"));
+        jobCombo = new JComboBox<>();
+        jobCombo.addItem(new CodeNameItem(-1, "全部"));
+        filterPanel.add(jobCombo);
+
+        filterPanel.add(new JLabel("状态:"));
+        stateCombo = new JComboBox<>(new String[]{"全部", "在职", "离职"});
+        filterPanel.add(stateCombo);
+
+        toolPanel.add(filterPanel, BorderLayout.NORTH);
+
+        // 搜索框和按钮面板
+        JPanel searchBtnPanel = new JPanel(new BorderLayout());
+
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         searchPanel.add(new JLabel("搜索:"));
         searchField = new JTextField(20);
@@ -41,7 +85,7 @@ public class EmployeePanel extends JPanel {
         JButton searchBtn = new JButton("搜索");
         searchBtn.addActionListener(this::searchEmployees);
         searchPanel.add(searchBtn);
-        toolPanel.add(searchPanel, BorderLayout.WEST);
+        searchBtnPanel.add(searchPanel, BorderLayout.WEST);
 
         // 操作按钮
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -53,13 +97,18 @@ public class EmployeePanel extends JPanel {
         addBtn.addActionListener(this::addEmployee);
         editBtn.addActionListener(this::editEmployee);
         deleteBtn.addActionListener(this::deleteEmployee);
-        refreshBtn.addActionListener(e -> loadEmployeeData());
+        refreshBtn.addActionListener(e -> {
+            currentPage = 1; // 刷新时回到第一页
+            loadEmployeeData();
+        });
 
         btnPanel.add(addBtn);
         btnPanel.add(editBtn);
         btnPanel.add(deleteBtn);
         btnPanel.add(refreshBtn);
-        toolPanel.add(btnPanel, BorderLayout.EAST);
+        searchBtnPanel.add(btnPanel, BorderLayout.EAST);
+
+        toolPanel.add(searchBtnPanel, BorderLayout.CENTER);
 
         add(toolPanel, BorderLayout.NORTH);
 
@@ -73,103 +122,251 @@ public class EmployeePanel extends JPanel {
         };
 
         employeeTable = new JTable(tableModel);
-        // 设置表格列宽
-        employeeTable.getColumnModel().getColumn(0).setPreferredWidth(80);
-        employeeTable.getColumnModel().getColumn(1).setPreferredWidth(80);
-        employeeTable.getColumnModel().getColumn(2).setPreferredWidth(50);
-        employeeTable.getColumnModel().getColumn(3).setPreferredWidth(100);
-        employeeTable.getColumnModel().getColumn(4).setPreferredWidth(100);
-        employeeTable.getColumnModel().getColumn(5).setPreferredWidth(120);
-        employeeTable.getColumnModel().getColumn(6).setPreferredWidth(60);
+        // 设置表格行高和字体
+        employeeTable.setRowHeight(35); // 增加行高
+        employeeTable.setFont(new Font("微软雅黑", Font.PLAIN, 14)); // 增大字体
+        employeeTable.getTableHeader().setFont(new Font("微软雅黑", Font.BOLD, 15)); // 表头字体加粗
+
+        // 调整表格列宽比例，减少空白
+        employeeTable.getColumnModel().getColumn(0).setPreferredWidth(90);
+        employeeTable.getColumnModel().getColumn(1).setPreferredWidth(90);
+        employeeTable.getColumnModel().getColumn(2).setPreferredWidth(60);
+        employeeTable.getColumnModel().getColumn(3).setPreferredWidth(110);
+        employeeTable.getColumnModel().getColumn(4).setPreferredWidth(110);
+        employeeTable.getColumnModel().getColumn(5).setPreferredWidth(130);
+        employeeTable.getColumnModel().getColumn(6).setPreferredWidth(70);
+
+        // 调整工具栏间距（原代码中toolPanel的布局设置处）
+        toolPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+
+        // 调整分页面板间距
+        JPanel paginationPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        paginationPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 0));
 
         // 添加表格到滚动面板
         JScrollPane scrollPane = new JScrollPane(employeeTable);
         add(scrollPane, BorderLayout.CENTER);
 
+        // 确保表格只能选择单行，避免多选导致的双击判断问题
+        employeeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
         // 添加双击事件,双击显示员工信息
-        employeeTable.addMouseListener(new java.awt.event.MouseAdapter() {
+        // 优化双击事件处理，确保稳定触发
+        employeeTable.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                if (evt.getClickCount() == 2) { // 双击事件
-                    int selectedRow = employeeTable.getSelectedRow();
-                    if (selectedRow != -1) {
-                        int employeeId = (int) employeeTable.getValueAt(selectedRow, 0);
-                        Employee employee = getEmployeeById(employeeId);
-                        if (employee != null) {
-                            // 显示详情对话框
-                            new EmployeeDetailDialog(
-                                    SwingUtil.getParentFrame(EmployeePanel.this),
-                                    "员工详细信息",
-                                    employee
-                            ).setVisible(true);
-                        } else {
-                            JOptionPane.showMessageDialog(EmployeePanel.this,
-                                    "无法获取员工详细信息", "错误", JOptionPane.ERROR_MESSAGE);
-                        }
+            public void mouseClicked(MouseEvent evt) {
+                // 1. 验证事件源和点击条件：必须是左键双击且点击在表格内容区域
+                if (evt.getButton() != MouseEvent.BUTTON1 || evt.getClickCount() != 2) {
+                    return;
+                }
+
+                // 2. 确定点击位置是否在有效单元格上
+                int row = employeeTable.rowAtPoint(evt.getPoint());
+                int col = employeeTable.columnAtPoint(evt.getPoint());
+                if (row == -1 || col == -1) { // 点击在表格空白区域
+                    return;
+                }
+
+                // 3. 确保行被选中（处理表格选择模式可能的影响）
+                employeeTable.setRowSelectionInterval(row, row);
+
+                // 4. 转换为模型索引（处理排序/过滤后的索引映射）
+                int modelRow = employeeTable.convertRowIndexToModel(row);
+
+                try {
+                    // 5. 安全获取员工ID（避免类型转换异常）
+                    Object idObj = employeeTable.getModel().getValueAt(modelRow, 0);
+                    if (!(idObj instanceof Integer)) {
+                        JOptionPane.showMessageDialog(EmployeePanel.this,
+                                "无效的员工ID格式", "错误", JOptionPane.ERROR_MESSAGE);
+                        return;
                     }
+                    int employeeId = (Integer) idObj;
+
+                    // 6. 获取员工信息并显示
+                    Employee employee = getEmployeeById(employeeId);
+                    if (employee != null) {
+                        new EmployeeDetailDialog(
+                                SwingUtil.getParentFrame(EmployeePanel.this),
+                                "员工详细信息",
+                                employee
+                        ).setVisible(true);
+                    } else {
+                        JOptionPane.showMessageDialog(EmployeePanel.this,
+                                "未找到ID为" + employeeId + "的员工信息",
+                                "提示", JOptionPane.INFORMATION_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    // 7. 捕获所有异常，确保不会因意外错误导致功能失效
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(EmployeePanel.this,
+                            "处理双击事件时发生错误: " + e.getMessage(),
+                            "错误", JOptionPane.ERROR_MESSAGE);
                 }
             }
         });
 
+        // 添加分页控件
+        prevBtn = new JButton("上一页");
+        prevBtn.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadEmployeeData();
+            }
+        });
+
+        pageInfoLabel = new JLabel("第 1 页，共 0 页");
+
+        nextBtn = new JButton("下一页");
+        nextBtn.addActionListener(e -> {
+            int totalPages = (totalRecords + pageSize - 1) / pageSize;
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadEmployeeData();
+            }
+        });
+
+        paginationPanel.add(prevBtn);
+        paginationPanel.add(pageInfoLabel);
+        paginationPanel.add(nextBtn);
+        add(paginationPanel, BorderLayout.SOUTH);
+
+        // 添加表头点击事件，实现排序
+        employeeTable.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int column = employeeTable.columnAtPoint(e.getPoint());
+                // 只处理ID(0)、姓名(1)、部门(3)、职位(4)列
+                if (column != 0 && column != 1 && column != 3 && column != 4) {
+                    return;
+                }
+
+                // 如果点击的是当前排序列，则切换排序方向
+                if (column == sortColumn) {
+                    ascending = !ascending;
+                } else {
+                    // 否则设置为新的排序列，默认正序
+                    sortColumn = column;
+                    ascending = true;
+                }
+
+                // 排序时重置到第一页
+                currentPage = 1;
+                // 重新加载数据（会带上排序条件）
+                loadEmployeeData();
+            }
+        });
     }
 
-    // 加载员工数据（实际项目中应从数据库加载）
+    // 加载筛选数据（部门、职位）
+    private void loadFilterData() {
+        // 加载部门
+        String deptSql = "SELECT id, name FROM department";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(deptSql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                departmentCombo.addItem(new CodeNameItem(
+                        rs.getInt("id"),
+                        rs.getString("name")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "加载部门数据失败");
+        }
+
+        // 加载职位
+        String jobSql = "SELECT code, description FROM job";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(jobSql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                jobCombo.addItem(new CodeNameItem(
+                        rs.getInt("code"),
+                        rs.getString("description")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "加载职位数据失败");
+        }
+
+        // 添加筛选事件监听
+        departmentCombo.addActionListener(e -> {
+            currentPage = 1;
+            loadEmployeeData();
+        });
+        jobCombo.addActionListener(e -> {
+            currentPage = 1;
+            loadEmployeeData();
+        });
+        stateCombo.addActionListener(e -> {
+            currentPage = 1;
+            loadEmployeeData();
+        });
+    }
+
+    // 加载员工数据（支持分页和筛选）
     private void loadEmployeeData() {
-        // 清空表格
+        // 获取筛选条件
+        CodeNameItem deptItem = (CodeNameItem) departmentCombo.getSelectedItem();
+        int deptId = deptItem.getCode();
+
+        CodeNameItem jobItem = (CodeNameItem) jobCombo.getSelectedItem();
+        int jobCode = jobItem.getCode();
+
+        String state = stateCombo.getSelectedItem().toString();
+        String keyword = searchField.getText().trim();
+
+        // 转换状态筛选条件（"全部"对应空值）
+        String stateParam = "全部".equals(state) ? "" : state;
+
+        // 计算分页偏移量
+        int offset = (currentPage - 1) * pageSize;
+
+        // 获取排序字段和方向
+        String sortField = getSortField(sortColumn);
+        String sortDirection = ascending ? "ASC" : "DESC";
+
+        // 从服务层获取数据（带排序条件）
+        EmployeeService service = new EmployeeService();
+        List<Employee> employees = service.getEmployeesByCondition(
+                keyword, deptId, jobCode, stateParam, offset, pageSize,
+                sortField, sortDirection
+        );
+
+        // 获取总记录数
+        totalRecords = service.getEmployeeCountByCondition(keyword, deptId, jobCode, stateParam);
+
+        // 更新表格数据
         tableModel.setRowCount(0);
-
-        // 模拟数据，实际应从数据库查询
-        List<Employee> employees = getSampleEmployees();
-
-        // 添加数据到表格
         for (Employee emp : employees) {
-            Object[] rowData = {
+            Object[] row = {
                     emp.getId(),
                     emp.getName(),
                     emp.getSex(),
-                    emp.getDepartmentId(),
-                    emp.getJobCode(),
+                    emp.getDepartmentName(),
+                    emp.getJobName(),
                     emp.getTel(),
-                    emp.getState() == 't' ? "在职" : "离职"  // 正确：char与char比较
+                    "t".equals(String.valueOf(emp.getState())) ? "在职" : "离职"
             };
-            tableModel.addRow(rowData);
+            tableModel.addRow(row);
         }
-    }
 
-    // 模拟员工数据
-    private List<Employee> getSampleEmployees() {
-        String sql = "SELECT id, name, sex, department, job, state, tel FROM person";
-        List<Employee> employees = new ArrayList<>();
-        try {
-            Connection conn = DBConnection.getConnection();
-            PreparedStatement pstmt = conn.prepareStatement(sql);
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                // 提取字段值（同样需与数据库表列名一致）
-                int id = rs.getInt("id");
-                String name = rs.getString("name");
-                String sex = rs.getString("sex");
-                int department = rs.getInt("department");
-                int job = rs.getInt("job");
-                String state = rs.getString("state");
-                String tel = rs.getString("tel");
+        // 更新分页信息
+        int totalPages = (totalRecords + pageSize - 1) / pageSize;
+        pageInfoLabel.setText("第 " + currentPage + " 页，共 " + totalPages + " 页");
 
-                // 3. 批量添加到列表（无需逐个写 add 语句）
-                Employee emp = new Employee(id, name, sex, department, job, tel);
-                emp.setState(state != null && state.length() > 0 ? state.charAt(0) : 't');
-                employees.add(emp);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return employees;
+        // 控制分页按钮状态
+        prevBtn.setEnabled(currentPage > 1);
+        nextBtn.setEnabled(currentPage < totalPages);
     }
 
     // 搜索员工
     private void searchEmployees(ActionEvent e) {
-        String keyword = searchField.getText().trim();
-        // 实际项目中应根据关键字查询数据库
-        JOptionPane.showMessageDialog(this, "搜索功能待实现: " + keyword);
+        currentPage = 1; // 搜索时回到第一页
+        loadEmployeeData();
     }
 
     private void addEmployee(ActionEvent e) {
@@ -217,40 +414,6 @@ public class EmployeePanel extends JPanel {
         }
     }
 
-    private Employee getEmployeeById(int employeeId) {
-        String sql = "SELECT * FROM person WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, employeeId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                Employee emp = new Employee();
-                emp.setId(rs.getInt("id"));
-                emp.setName(rs.getString("name"));
-                emp.setSex(rs.getString("sex"));
-                emp.setBirthday(rs.getDate("birthday"));
-                emp.setDepartmentId(rs.getInt("department"));
-                emp.setJobCode(rs.getInt("job"));
-                emp.setEduLevelCode(rs.getInt("edu_level"));
-                emp.setSpecialty(rs.getString("specialty"));
-                emp.setAddress(rs.getString("address"));
-                emp.setTel(rs.getString("tel")); // 确保电话被加载
-                emp.setEmail(rs.getString("email"));
-                emp.setState(rs.getString("state") != null && !rs.getString("state").isEmpty()
-                        ? rs.getString("state").charAt(0) : 't');
-                emp.setRemark(rs.getString("remark"));
-
-                // 加载关联名称（部门、职位、学历）
-                loadRelatedNames(emp);
-
-                return emp;
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     // 新增：加载关联表的名称信息
     private void loadRelatedNames(Employee emp) {
         try {
@@ -291,6 +454,11 @@ public class EmployeePanel extends JPanel {
         }
     }
 
+    // 添加获取员工详情的方法
+    private Employee getEmployeeById(int employeeId) {
+        EmployeeService service = new EmployeeService();
+        return service.getEmployeeById(employeeId);
+    }
     private void deleteEmployee(ActionEvent e) {
         int selectedRow = employeeTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -314,6 +482,34 @@ public class EmployeePanel extends JPanel {
             } else {
                 SwingUtil.showErrorDialog(this, "删除失败");
             }
+        }
+    }
+
+    // 添加分页信息更新方法
+    private void updatePaginationInfo() {
+        // 实际应用中应该从数据库查询总记录数
+        totalRecords = new EmployeeService().getEmployeeCount(
+                searchField.getText().trim(),
+                ((CodeNameItem)departmentCombo.getSelectedItem()).getCode(),
+                ((CodeNameItem)jobCombo.getSelectedItem()).getCode(),
+                "全部".equals((String)stateCombo.getSelectedItem()) ? "" : (String)stateCombo.getSelectedItem()
+        );
+
+        int totalPages = (totalRecords + pageSize - 1) / pageSize;
+        pageInfoLabel.setText("第 " + currentPage + " 页，共 " + totalPages + " 页");
+
+        prevBtn.setEnabled(currentPage > 1);
+        nextBtn.setEnabled(currentPage < totalPages);
+    }
+
+    // 添加排序字段映射方法
+    private String getSortField(int column) {
+        switch (column) {
+            case 0: return "p.id";          // ID列对应数据库字段
+            case 1: return "p.name";        // 姓名字段
+            case 3: return "d.name";        // 部门名称
+            case 4: return "j.description"; // 职位名称
+            default: return "p.id";         // 默认按ID排序
         }
     }
 }

@@ -58,7 +58,9 @@ public class Employee {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
-    public String getAuthority() { return authority; }
+    public String getAuthority() {
+        return authority;
+    }
     public void setAuthority(String authority) { this.authority = authority; }
 
     public String getName() { return name; }
@@ -100,10 +102,95 @@ public class Employee {
     public String getDepartmentName() { return departmentName; }
     public void setDepartmentName(String departmentName) { this.departmentName = departmentName; }
 
-    public String getJobName() { return jobName; }
+    public String getJobName() {
+        switch (jobCode){
+            case 1:
+                jobName = "部门经理";
+                break;
+            case 2:
+                jobName = "高级工程师";
+                break;
+            case 3:
+                jobName = "人事专员";
+                break;
+            case 4:
+                jobName = "会计";
+                break;
+            case 5:
+                jobName = "销售代表";
+                break;
+                case 6:
+                    jobName = "行政助理";
+                    break;
+                case 7:
+                    jobName = "初级工程师";
+                    break;
+                case 8:
+                    jobName = "财务主管";
+                    break;
+                case 9:
+                    jobName = "测试工程师";
+                    break;
+                case 10:
+                    jobName = "算法工程师";
+                    break;
+                case 11:
+                    jobName = "市场专员";
+                    break;
+                case 12:
+                    jobName = "销售经理";
+                    break;
+                case 13:
+                    jobName = "后勤主管";
+                    break;
+                case 14:
+                    jobName = "AI 训练师";
+                    break;
+                case 15:
+                    jobName = "数据架构师";
+                    break;
+                default:
+                    jobName = "未知";
+                    break;
+        }
+        return jobName;
+    }
     public void setJobName(String jobName) { this.jobName = jobName; }
 
-    public String getEduLevelName() { return eduLevelName; }
+    public String getEduLevelName() {
+        switch (eduLevelCode){
+            case 0:
+                eduLevelName = "小学";
+                break;
+            case 1:
+                eduLevelName = "初中";
+                break;
+            case 2:
+                eduLevelName = "高中";
+                break;
+            case 3:
+                eduLevelName = "职高";
+                break;
+            case 4:
+                eduLevelName = "大专";
+                break;
+            case 5:
+                eduLevelName = "大本";
+                break;
+            case 6:
+                eduLevelName = "硕士";
+                break;
+            case 7:
+                eduLevelName = "博士";
+                break;
+            case 8:
+                eduLevelName = "博士后";
+                break;
+            default:
+                eduLevelName = "未知";
+        }
+        return eduLevelName;
+    }
     public void setEduLevelName(String eduLevelName) { this.eduLevelName = eduLevelName; }
     public boolean isAdmin() {
         return "manager".equals(authority) || "admin".equals(authority);
@@ -113,30 +200,7 @@ public class Employee {
         return "staff".equals(authority);
     }
 
-    // 根据数据库关联关系建立映射的方法
-    public void setDepartmentNameById(int deptId, java.util.Map<Integer, String> departmentMap) {
-        this.departmentId = deptId;
-        this.departmentName = departmentMap != null ? departmentMap.get(deptId) : null;
-    }
 
-    public void setJobNameByCode(int jobCode, java.util.Map<Integer, String> jobMap) {
-        this.jobCode = jobCode;
-        this.jobName = jobMap != null ? jobMap.get(jobCode) : null;
-    }
-
-    public void setEduLevelNameByCode(int eduLevelCode, java.util.Map<Integer, String> eduLevelMap) {
-        this.eduLevelCode = eduLevelCode;
-        this.eduLevelName = eduLevelMap != null ? eduLevelMap.get(eduLevelCode) : null;
-    }
-
-    // 从ID映射更新显示名称
-    public void updateDisplayNames(java.util.Map<Integer, String> departmentMap,
-                                   java.util.Map<Integer, String> jobMap,
-                                   java.util.Map<Integer, String> eduLevelMap) {
-        this.departmentName = departmentMap != null ? departmentMap.get(this.departmentId) : null;
-        this.jobName = jobMap != null ? jobMap.get(this.jobCode) : null;
-        this.eduLevelName = eduLevelMap != null ? eduLevelMap.get(this.eduLevelCode) : null;
-    }
 
     // 重写toString方法便于调试
     @Override

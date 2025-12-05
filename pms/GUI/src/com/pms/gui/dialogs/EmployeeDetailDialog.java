@@ -79,15 +79,28 @@ public class EmployeeDetailDialog extends JDialog {
 
 
     // 工具方法：添加标签和文本框
-    private void addField(JPanel panel, GridBagConstraints gbc, String label, String value) {
+    private void addField(JPanel panel, GridBagConstraints gbc, String labelText, String value) {
+        // 标签
         gbc.gridx = 0;
-        panel.add(new JLabel(label), gbc);
-        
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.weightx = 0;
+        JLabel label = new JLabel(labelText);
+        // 确保标签文本正确，没有多余字符
+        label.setText(labelText.trim());
+        panel.add(label, gbc);
+
+        // 文本框
         gbc.gridx = 1;
-        JTextField field = new JTextField(value == null ? "" : value, 20);
-        field.setEditable(false);
-        panel.add(field, gbc);
-        
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+        JTextField textField = new JTextField(value);
+        textField.setEditable(false);
+        textField.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+        panel.add(textField, gbc);
+
+        // 移至下一行
         gbc.gridy++;
     }
 }
