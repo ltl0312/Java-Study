@@ -148,13 +148,17 @@ public class EmployeeDialog extends JDialog {
              ResultSet rs = pstmt.executeQuery()) {
             while (rs.next()) {
                 jobCombo.addItem(new CodeNameItem(
-                        rs.getInt("code"),  // 职位代码（int）
-                        rs.getString("description")  // 职位名称
+                        rs.getInt("code"),  // 职位代码（1-15）
+                        rs.getString("description")
                 ));
+            }
+            // 新增：加载完成后默认选中第一个有效职位
+            if (jobCombo.getItemCount() > 0) {
+                jobCombo.setSelectedIndex(0);
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "加载职位数据失败");
+            JOptionPane.showMessageDialog(this, "加载职位数据失败: " + e.getMessage());
         }
 
         // 加载学历（edu_level.code 对应 学历代码）
@@ -225,28 +229,15 @@ public class EmployeeDialog extends JDialog {
      * 确认按钮逻辑：封装员工数据（部门/职位/学历用int代码）
      */
     private void confirmAction(ActionEvent e) {
-        // 数据校验（省略）
-        if (employee == null) {
-            employee = new Employee();
+        // 校验职位是否有效
+        CodeNameItem jobItem = (CodeNameItem) jobCombo.getSelectedItem();
+        if (jobItem == null || jobItem.getCode() <= 0) {
+            JOptionPane.showMessageDialog(this, "请选择有效的职位", "输入错误", JOptionPane.ERROR_MESSAGE);
+            return; // 终止保存，返回重新选择
         }
 
-        // 基本信息
-        employee.setId(Integer.parseInt(idField.getText().trim()));
-        employee.setName(nameField.getText().trim());
-        employee.setSex(maleRadio.isSelected() ? "男" : "女");
-
-        // 核心修改：获取部门/职位/学历的int代码
-        CodeNameItem deptItem = (CodeNameItem) departmentCombo.getSelectedItem();
-        employee.setDepartmentId(deptItem.getCode()); // 部门代码（int）
-
-        CodeNameItem jobItem = (CodeNameItem) jobCombo.getSelectedItem();
-        employee.setJobCode(jobItem.getCode()); // 职位代码（int）
-
-        CodeNameItem eduItem = (CodeNameItem) eduLevelCombo.getSelectedItem();
-        employee.setEduLevelCode(eduItem.getCode()); // 学历代码（int）
-
-        // 其他字段设置（生日、电话等）...
-
+        // 其他逻辑...
+        employee.setJobCode(jobItem.getCode()); // 确保赋值的是有效代码
         confirmed = true;
         dispose();
     }

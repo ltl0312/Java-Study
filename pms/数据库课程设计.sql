@@ -52,13 +52,24 @@ create table person (
 
 -- 6. 人事变更记录表 personnel（修正：`change`加反引号）
 create table personnel (
-    id int primary key,  -- 记录编号（主键）
-    person int not null,  -- 员工号（外键，关联person.id）
+    id int  AUTO_INCREMENT primary key,  -- 记录编号（主键）
+    person_id int not null,  -- 员工号（外键，关联person.id）
+    person_name varchar(20), -- 员工姓名
     `change` int not null,  -- 变更代码（保留关键字，加反引号）
     description text,  -- 详细记录
-    foreign key (person) references person(id)on update cascade,
+    foreign key (person_id) references person(id)on update cascade,
     foreign key (`change`) references personnel_change(code)on update cascade
 );
+
+drop table personnel;
+
+-- 为personnel表添加变动时间字段
+ALTER TABLE personnel ADD COLUMN change_time datetime NOT NULL;
+
+drop table personnel;
+
+ALTER TABLE personnel
+ADD name varchar(20) not null AFTER person;
 
 -- 1. 插入受教育程度代码（表7）
 insert into edu_level (code, description) values
@@ -186,3 +197,9 @@ insert into person (id, password, authority, name, sex, birthday, department, jo
 UPDATE department
 SET department.id = 1
 WHERE department.id = 101;
+
+-- 插入部门变动类型（在数据库课程设计.sql中补充）
+insert into personnel_change (code, description) values
+(3, '部门变动'); -- 新增部门变动类型
+
+

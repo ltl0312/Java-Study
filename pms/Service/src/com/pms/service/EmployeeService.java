@@ -15,6 +15,12 @@ public class EmployeeService {
      * 添加员工（使用int类型的部门/职位/学历代码）
      */
     public boolean addEmployee(Employee employee) {
+        // 新增验证
+        if (!isValidJobCode(employee.getJobCode())) {
+            System.err.println("无效的职位代码: " + employee.getJobCode());
+            return false;
+        }
+
         boolean success = false;
         String sql = "INSERT INTO person (" +
                 "id, password, authority, name, sex, birthday, " +
@@ -104,6 +110,12 @@ public class EmployeeService {
 
     // 其他方法（updateEmployee等）...
     public boolean updateEmployee(Employee employee) {
+        // 新增验证
+        if (!isValidJobCode(employee.getJobCode())) {
+            System.err.println("无效的职位代码: " + employee.getJobCode());
+            return false;
+        }
+
         // 1. 查询旧部门ID和旧职位信息（用于对比是否变动）
         int oldDeptId = 0;
         String oldJob = "";
@@ -130,7 +142,19 @@ public class EmployeeService {
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            // 原有参数设置（省略）
+            pstmt.setString(1, employee.getName());
+            pstmt.setString(2, employee.getSex());
+            pstmt.setDate(3, new java.sql.Date(employee.getBirthday().getTime()));
+            pstmt.setInt(4, employee.getDepartmentId()); // 部门ID
+            pstmt.setInt(5, employee.getJobCode());      // 职位代码
+            pstmt.setInt(6, employee.getEduLevelCode()); // 学历代码
+            pstmt.setString(7, employee.getSpecialty());
+            pstmt.setString(8, employee.getAddress());
+            pstmt.setString(9, employee.getTel());
+            pstmt.setString(10, employee.getEmail());
+            pstmt.setString(11, employee.getRemark());
+            pstmt.setString(12, String.valueOf(employee.getState()));    // 员工状态（如"t"在职/"f"离职）
+            pstmt.setInt(13, employee.getId());          // WHERE条件的员工ID
             pstmt.executeUpdate();
             success = true;
         } catch (SQLException e) {
@@ -144,6 +168,7 @@ public class EmployeeService {
             String newJob = employee.getJobName();
             int newDeptId = employee.getDepartmentId();
             PersonnelChangeService changeService = new PersonnelChangeService();
+
 
             // 记录职位变动（原有逻辑）
             if (!oldJob.equals(newJob)) {
@@ -342,7 +367,6 @@ public class EmployeeService {
         return employees;
     }
 
-    // 在 EmployeeService.java 中添加如下方法
     /**
      * 根据条件查询员工总记录数（修复表名错误）
      */
@@ -376,8 +400,15 @@ public class EmployeeService {
 
         // 职位筛选
         if (jobCode != -1) {
-            sql.append("AND p.job = ? ");
-            params.add(jobCode);
+            // 假设有效的职位代码为正整数（根据实际数据库设计调整范围）
+            if (jobCode <= 0) {
+                System.out.println("无效的职位代码: " + jobCode);
+                // 可选择抛出异常或忽略该条件
+                // throw new IllegalArgumentException("职位代码必须为正整数");
+            } else {
+                sql.append("AND p.job = ? ");
+                params.add(jobCode);
+            }
         }
 
         // 状态筛选（匹配person表的state字段）
@@ -501,5 +532,17 @@ public class EmployeeService {
         }
         return count;
     }
+
+    // 添加验证方法
+    private boolean isValidJobCode(int jobCode) {
+        // 根据数据库中job表的code范围（1-15）校验
+        boolean valid = jobCode >= 1 && jobCode <= 15;
+        if (!valid) {
+            System.err.println("无效的职位代码: " + jobCode + "（有效范围：1-15）");
+        }
+        return valid;
+    }
+
+
 
 }

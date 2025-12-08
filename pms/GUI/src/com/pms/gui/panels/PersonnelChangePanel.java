@@ -185,13 +185,13 @@ public class PersonnelChangePanel extends JPanel {
 
         // 修正：正确关联表并获取所有字段
         String countSql = "SELECT COUNT(*) FROM personnel p " +
-                "LEFT JOIN person pe ON p.person = pe.id " +
+                "LEFT JOIN person pe ON p.person_id = pe.id " +
                 "LEFT JOIN personnel_change pc ON p.`change` = pc.code";
 
         String dataSql = String.format(
-                "SELECT p.id, p.person, pe.name, pc.description, p.description, p.change_time " +
+                "SELECT p.id, p.person_id, pe.name, pc.description, p.description, p.change_time " +
                         "FROM personnel p " +
-                        "LEFT JOIN person pe ON p.person = pe.id " +
+                        "LEFT JOIN person pe ON p.person_id = pe.id " +
                         "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
                         "ORDER BY %s %s LIMIT %d, %d",
                 sortField, order, offset, pageSize

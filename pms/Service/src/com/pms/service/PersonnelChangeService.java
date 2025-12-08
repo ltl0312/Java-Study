@@ -70,17 +70,17 @@ public class PersonnelChangeService extends BaseService {
         // 2. 调用getChangeCode（此时已确保changeType非空）
         int changeCode = getChangeCode(change.getChangeType());
         String sql = "INSERT INTO personnel " +  // 修正表名
-                "(person, employee_name, `change`, change_type, description, change_time) " +  // 调整字段名匹配personnel表
-                "VALUES (?, ?, ?, ?, ?, ?)";
+                "(person_id, person_name, `change`, description, change_time) " +  // 调整字段名匹配personnel表
+                "VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, change.getEmployeeId());  // 对应person字段（员工ID）
             pstmt.setString(2, change.getEmployeeName());
             pstmt.setInt(3, changeCode);  // 对应change字段（变动类型编码）
-            pstmt.setString(4, change.getChangeType());
-            pstmt.setString(5, change.getDescription());
-            pstmt.setTimestamp(6, change.getChangeTime());
+            //pstmt.setString(4, change.getChangeType());
+            pstmt.setString(4, change.getDescription());
+            pstmt.setTimestamp(5, change.getChangeTime());
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
@@ -101,10 +101,10 @@ public class PersonnelChangeService extends BaseService {
 
         // 2. 初始化变动类型与编码的映射（确保key非空）
         Map<String, Integer> typeMap = new HashMap<>();
-        typeMap.put("职务变动", 2);
+        typeMap.put("新员工加入", 0);
+        typeMap.put("职务变动", 1);
+        typeMap.put("辞退", 2);
         typeMap.put("部门变动", 3);
-        typeMap.put("辞退", 4);
-        typeMap.put("新员工加入", 1); // 补充所有变动类型
 
         // 3. 若未匹配到类型，返回兜底值（避免返回null）
         Integer code = typeMap.get(changeType.trim());
@@ -173,6 +173,20 @@ public class PersonnelChangeService extends BaseService {
             return false;
         } finally {
             closeResources(conn, pstmt, null);
+        }
+    }
+
+    /**
+     * 重置人事变动记录的自增ID，使其从1开始
+     */
+    public void resetAutoIncrement() {
+        String sql = "ALTER TABLE personnel AUTO_INCREMENT = 1";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.err.println("重置自增ID失败: " + e.getMessage());
         }
     }
 }
