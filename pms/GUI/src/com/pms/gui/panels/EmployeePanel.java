@@ -1,8 +1,9 @@
 // 修改 EmployeePanel.java
 package com.pms.gui.panels;
 
-import com.pms.gui.dialogs.EmployeeDetailDialog;
 import com.pms.gui.dialogs.EmployeeDialog;
+import com.pms.gui.dialogs.EmployeeDetailDialog;
+import com.pms.gui.dialogs.PersonnelChangeDialog;
 import com.pms.model.CodeNameItem;
 import com.pms.model.Employee;
 import com.pms.service.EmployeeService;
@@ -369,18 +370,23 @@ public class EmployeePanel extends JPanel {
         loadEmployeeData();
     }
 
+    // 添加员工 - 改为使用人事变动界面的新员工加入功能
     private void addEmployee(ActionEvent e) {
-        EmployeeDialog dialog = new EmployeeDialog(SwingUtil.getParentFrame(this), "添加员工", null);
+        // 创建并显示人事变动对话框，设置为"新员工加入"类型
+        PersonnelChangeDialog dialog = new PersonnelChangeDialog(
+                SwingUtil.getParentFrame(this),
+                "添加新员工"
+        );
+
+        // 自动选择"新员工加入"类型
+        dialog.getChangeTypeCombo().setSelectedItem("新员工加入");
+        
         dialog.setVisible(true);
-        EmployeeService employeeService = new EmployeeService();
+
+        // 如果用户点击了确认按钮，员工会通过人事变动自动添加
         if (dialog.isConfirmed()) {
-            Employee employee = dialog.getEmployee();
-            if (employeeService.addEmployee(employee)) {  // 调用服务类添加方法
-                SwingUtil.showInfoDialog(this, "添加成功");
-                loadEmployeeData();
-            } else {
-                SwingUtil.showErrorDialog(this, "添加失败");
-            }
+            SwingUtil.showInfoDialog(this, "员工添加成功");
+            loadEmployeeData(); // 刷新数据
         }
     }
 

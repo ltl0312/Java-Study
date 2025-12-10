@@ -26,18 +26,20 @@ public class PersonnelChangeService extends BaseService {
 
         try {
             conn = getConnection();
-            String sql = "SELECT id, employee_id, employee_name, change_type, description, change_time " +
-                       "FROM personnel_change ORDER BY change_time DESC";
+            String sql = "SELECT p.id, p.person_id, p.person_name, pc.description AS change_type_desc, p.description AS change_remark, p.change_time " +
+                       "FROM personnel p " +
+                       "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
+                       "ORDER BY p.change_time DESC";
             pstmt = conn.prepareStatement(sql);
             rs = pstmt.executeQuery();
 
             while (rs.next()) {
                 PersonnelChange change = new PersonnelChange();
                 change.setId(rs.getInt("id"));
-                change.setEmployeeId(rs.getInt("employee_id"));
-                change.setEmployeeName(rs.getString("employee_name"));
-                change.setChangeType(rs.getString("change_type"));
-                change.setDescription(rs.getString("description"));
+                change.setEmployeeId(rs.getInt("person_id"));
+                change.setEmployeeName(rs.getString("person_name"));
+                change.setChangeType(rs.getString("change_type_desc"));
+                change.setDescription(rs.getString("change_remark"));
                 change.setChangeTime(rs.getTimestamp("change_time"));
                 changes.add(change);
             }
@@ -69,16 +71,15 @@ public class PersonnelChangeService extends BaseService {
 
         // 2. 调用getChangeCode（此时已确保changeType非空）
         int changeCode = getChangeCode(change.getChangeType());
-        String sql = "INSERT INTO personnel " +  // 修正表名
-                "(person_id, person_name, `change`, description, change_time) " +  // 调整字段名匹配personnel表
+        String sql = "INSERT INTO personnel " +
+                "(person_id, person_name, `change`, description, change_time) " +
                 "VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, change.getEmployeeId());  // 对应person字段（员工ID）
+            pstmt.setInt(1, change.getEmployeeId());
             pstmt.setString(2, change.getEmployeeName());
-            pstmt.setInt(3, changeCode);  // 对应change字段（变动类型编码）
-            //pstmt.setString(4, change.getChangeType());
+            pstmt.setInt(3, changeCode);
             pstmt.setString(4, change.getDescription());
             pstmt.setTimestamp(5, change.getChangeTime());
             pstmt.executeUpdate();
@@ -126,11 +127,11 @@ public class PersonnelChangeService extends BaseService {
 
         try {
             conn = getConnection();
-            String sql = "SELECT p.id, p.person, pe.name, pc.description, p.description, p.change_time " +
+            String sql = "SELECT p.id, p.person_id, pe.name, pc.description, p.description, p.change_time " +
                     "FROM personnel p " +
-                    "LEFT JOIN person pe ON p.person = pe.id " +
+                    "LEFT JOIN person pe ON p.person_id = pe.id " +
                     "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
-                    "WHERE p.person = ? " +
+                    "WHERE p.person_id = ? " +
                     "ORDER BY p.change_time DESC";
 
             pstmt = conn.prepareStatement(sql);
@@ -177,16 +178,76 @@ public class PersonnelChangeService extends BaseService {
     }
 
     /**
+     * 删除所有人事变动记录
+     */
+    public boolean deleteAllChanges() {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+
+        try {
+            conn = getConnection();
+            String sql = "DELETE FROM personnel";
+            pstmt = conn.prepareStatement(sql);
+            return pstmt.executeUpdate() >= 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            closeResources(conn, pstmt, null);
+        }
+    }
+
+    /**
      * 重置人事变动记录的自增ID，使其从1开始
      */
-    public void resetAutoIncrement() {
+    public boolean resetAutoIncrement() {
         String sql = "ALTER TABLE personnel AUTO_INCREMENT = 1";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.executeUpdate();
+            return true;
         } catch (SQLException e) {
             e.printStackTrace();
             System.err.println("重置自增ID失败: " + e.getMessage());
+            return false;
         }
+    }
+
+    /**
+     * 根据ID获取单个人事变动记录
+     */
+    public PersonnelChange getChangeById(int changeId) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        PersonnelChange change = null;
+
+        try {
+            conn = getConnection(); // 使用BaseService提供的方法获取连接
+            // 简化查询语句，根据表结构直接查询需要的字段
+            String sql = "SELECT p.id, p.person_id, p.person_name, pc.description AS change_type_desc, p.description AS change_remark, p.change_time " +
+                    "FROM personnel p " +
+                    "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
+                    "WHERE p.id = ?";
+
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, changeId);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                change = new PersonnelChange();
+                change.setId(rs.getInt("id"));
+                change.setEmployeeId(rs.getInt("person_id"));
+                change.setEmployeeName(rs.getString("person_name"));
+                change.setChangeType(rs.getString("change_type_desc")); // 变动类型描述
+                change.setDescription(rs.getString("change_remark")); // 变动备注
+                change.setChangeTime(rs.getTimestamp("change_time"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            closeResources(conn, pstmt, rs); // 使用BaseService提供的方法关闭资源
+        }
+        return change;
     }
 }

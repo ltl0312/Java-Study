@@ -10,7 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EmployeeService {
+public class EmployeeService extends BaseService {
     /**
      * 添加员工（使用int类型的部门/职位/学历代码）
      */
@@ -64,46 +64,65 @@ public class EmployeeService {
         return success;
     }
 
-    // 删除员工（待实现）
+    // 删除员工
     public boolean deleteEmployee(int employeeId) {
-        // 获取员工姓名
-        String employeeName = "";
-        String sql1 = "SELECT name FROM PERSON WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql1)) {
-            pstmt.setInt(1, employeeId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                employeeName = rs.getString("name");
-            }
-        } catch (SQLException e) {
-            System.out.println("Error: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        // 实现删除逻辑
         boolean success = false;
-        String sql = "DELETE FROM person WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, employeeId);
-            pstmt.executeUpdate();
-            success = true;
+        String employeeName = "";
+        
+        try {
+            // 1. 先获取员工姓名
+            String sql1 = "SELECT name FROM person WHERE id = ?";
+            try (Connection conn1 = DBConnection.getConnection();
+                 PreparedStatement pstmt1 = conn1.prepareStatement(sql1)) {
+                pstmt1.setInt(1, employeeId);
+                try (ResultSet rs = pstmt1.executeQuery()) {
+                    if (rs.next()) {
+                        employeeName = rs.getString("name");
+                    } else {
+                        System.out.println("员工不存在，ID：" + employeeId);
+                        return false;
+                    }
+                }
+            }
+            
+            // 2. 先删除personnel表中相关的人事变动记录
+            String sqlDeletePersonnel = "DELETE FROM personnel WHERE person_id = ?";
+            try (Connection conn = DBConnection.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sqlDeletePersonnel)) {
+                pstmt.setInt(1, employeeId);
+                pstmt.executeUpdate();
+            }
+            
+            // 3. 执行删除员工操作
+            String sql = "DELETE FROM person WHERE id = ?";
+            try (Connection conn = DBConnection.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, employeeId);
+                int rows = pstmt.executeUpdate();
+                success = (rows > 0);
+            }
+            
+            // 3. 删除成功后记录人事变动（非事务性，即使记录失败也不影响删除）
+            if (success) {
+                PersonnelChange change = new PersonnelChange();
+                change.setEmployeeId(employeeId);
+                change.setEmployeeName(employeeName);
+                change.setChangeType("辞退");
+                change.setDescription("员工被辞退");
+                change.setChangeTime(new Timestamp(new Date().getTime()));
+
+                PersonnelChangeService changeService = new PersonnelChangeService();
+                try {
+                    changeService.addChange(change);
+                } catch (Exception e) {
+                    System.out.println("记录人事变动失败，但员工删除已成功：" + e.getMessage());
+                    // 不影响删除结果，继续返回成功
+                }
+            }
+            
         } catch (SQLException e) {
-            System.out.println("Error: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        // 删除成功后记录人事变动
-        if (success) {
-
-            PersonnelChange change = new PersonnelChange();
-            change.setEmployeeId(employeeId);
-            change.setEmployeeName(employeeName);
-            change.setChangeType("辞退");
-            change.setDescription("员工已离职");
-            change.setChangeTime(Timestamp.valueOf(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())));
-
-            PersonnelChangeService changeService = new PersonnelChangeService();
-            changeService.addChange(change);
+            System.out.println("Error in deleteEmployee: " + e.getMessage());
+            e.printStackTrace();
         }
         return success;
     }
@@ -164,6 +183,12 @@ public class EmployeeService {
 
         // 3. 若更新成功，记录变动（职位/部门）
         if (success) {
+            // 检查是否是员工状态变更（如辞退），如果是则不记录职位/部门变动
+            if (employee.getState() == 'f') {
+                // 员工被标记为离职，不记录职位/部门变动
+                return success;
+            }
+            
             String employeeName = employee.getName();
             String newJob = employee.getJobName();
             int newDeptId = employee.getDepartmentId();
@@ -542,7 +567,61 @@ public class EmployeeService {
         }
         return valid;
     }
-
-
+    
+    /**
+     * 根据部门编号自动生成员工ID
+     * 生成规则：部门编号 + 三位序列号，例如部门编号为1，员工ID为1001, 1002, 1003...
+     * 注意：需要检查所有部门的员工ID以确保唯一性，因为员工变动部门时ID会保留
+     */
+    public int generateEmployeeIdByDepartmentId(int departmentId) {
+        // 1. 先查询该部门中的最大员工ID
+        int maxDeptId = 0;
+        String sqlDept = "SELECT MAX(id) FROM person WHERE department = ?";
+        
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sqlDept)) {
+            
+            pstmt.setInt(1, departmentId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next() && rs.getInt(1) > 0) {
+                maxDeptId = rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // 2. 同时查询整个系统中的最大员工ID，确保生成的ID唯一
+        int maxSystemId = 0;
+        String sqlAll = "SELECT MAX(id) FROM person";
+        
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sqlAll)) {
+            
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next() && rs.getInt(1) > 0) {
+                maxSystemId = rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // 3. 生成新的员工ID
+        int prefix = departmentId * 1000;
+        int newId = prefix + 1;
+        
+        // 如果部门中已有员工，则在部门最大ID基础上加1
+        if (maxDeptId > prefix) {
+            newId = maxDeptId + 1;
+        }
+        
+        // 确保生成的ID大于系统中任何已有的ID
+        if (maxSystemId >= newId) {
+            newId = maxSystemId + 1;
+        }
+        
+        return newId;
+    }
 
 }

@@ -4,6 +4,7 @@ import com.pms.gui.dialogs.PersonnelChangeDialog;
 import com.pms.model.Employee;
 import com.pms.model.PersonnelChange;
 import com.pms.service.EmployeeService;
+import com.pms.service.DepartmentService;
 import com.pms.service.PersonnelChangeService;
 import com.pms.utils.DBConnection;
 import com.pms.utils.SwingUtil;
@@ -63,19 +64,13 @@ public class PersonnelChangePanel extends JPanel {
 
         // 操作按钮
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton addBtn = new JButton("添加变动记录");
-        JButton deleteBtn = new JButton("删除记录");
         JButton refreshBtn = new JButton("刷新");
 
-        addBtn.addActionListener(this::addChangeRecord);
-        deleteBtn.addActionListener(this::deleteChangeRecord);
         refreshBtn.addActionListener(e -> {
             currentPage = 1;
             loadChangeData();
         });
 
-        btnPanel.add(addBtn);
-        btnPanel.add(deleteBtn);
         btnPanel.add(refreshBtn);
         toolPanel.add(btnPanel, BorderLayout.EAST);
 
@@ -121,6 +116,8 @@ public class PersonnelChangePanel extends JPanel {
                 }
             }
         });
+
+        // 移除双击事件监听，按照需求删除双击功能
 
         JScrollPane scrollPane = new JScrollPane(changeTable);
         add(scrollPane, BorderLayout.CENTER);
@@ -173,25 +170,21 @@ public class PersonnelChangePanel extends JPanel {
         updatePageInfo();
     }
 
-    // 从数据库获取变动记录（核心修正：适配通用表结构，解决字段不存在问题）
-    // 从数据库获取变动记录（修正版）
+    // 从数据库获取变动记录
     private List<PersonnelChange> getChangesFromDB() {
         List<PersonnelChange> changes = new ArrayList<>();
-        // 排序字段映射：适配数据库字段
-        String[] sortFields = {"p.id", "p.person", "pe.name", "pc.description", "p.description", "p.change_time"};
+        // 排序字段映射：适配personnel表字段
+        String[] sortFields = {"p.id", "p.person_id", "p.person_name", "pc.description", "p.description", "p.change_time"};
         String sortField = sortFields[sortColumn];
         String order = ascending ? "ASC" : "DESC";
         int offset = (currentPage - 1) * pageSize;
 
-        // 修正：正确关联表并获取所有字段
-        String countSql = "SELECT COUNT(*) FROM personnel p " +
-                "LEFT JOIN person pe ON p.person_id = pe.id " +
-                "LEFT JOIN personnel_change pc ON p.`change` = pc.code";
+        // 查询personnel表获取变动记录
+        String countSql = "SELECT COUNT(*) FROM personnel p";
 
         String dataSql = String.format(
-                "SELECT p.id, p.person_id, pe.name, pc.description, p.description, p.change_time " +
+                "SELECT p.id, p.person_id, p.person_name, pc.description, p.description, p.change_time " +
                         "FROM personnel p " +
-                        "LEFT JOIN person pe ON p.person_id = pe.id " +
                         "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
                         "ORDER BY %s %s LIMIT %d, %d",
                 sortField, order, offset, pageSize
@@ -213,7 +206,7 @@ public class PersonnelChangePanel extends JPanel {
                 change.setId(rs.getInt(1));                  // 记录ID
                 change.setEmployeeId(rs.getInt(2));          // 员工ID
                 change.setEmployeeName(rs.getString(3));     // 员工姓名
-                change.setChangeType(rs.getString(4));       // 变动类型（从personnel_change表获取）
+                change.setChangeType(rs.getString(4));       // 变动类型
                 change.setDescription(rs.getString(5));      // 变动描述
                 change.setChangeTime(rs.getTimestamp(6));    // 变动时间（包含时分）
                 changes.add(change);
@@ -229,11 +222,10 @@ public class PersonnelChangePanel extends JPanel {
     private void searchChanges(ActionEvent e) {
         String keyword = searchField.getText().trim();
         tableModel.setRowCount(0);
-        String sql = "SELECT p.id, p.person, pe.name, pc.description, p.description, p.change_time " +
+        String sql = "SELECT p.id, p.person_id, p.person_name, pc.description, p.description, p.change_time " +
                 "FROM personnel p " +
-                "LEFT JOIN person pe ON p.person = pe.id " +
                 "LEFT JOIN personnel_change pc ON p.`change` = pc.code " +
-                "WHERE pe.name LIKE ? OR p.person = ? OR pc.description LIKE ?";
+                "WHERE p.person_name LIKE ? OR p.person_id = ? OR pc.description LIKE ? OR p.description LIKE ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -245,6 +237,7 @@ public class PersonnelChangePanel extends JPanel {
                 pstmt.setInt(2, -1); // 无效ID，不匹配
             }
             pstmt.setString(3, likeKeyword); // 搜索变动类型
+            pstmt.setString(4, likeKeyword); // 搜索变动描述
 
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -263,83 +256,7 @@ public class PersonnelChangePanel extends JPanel {
         }
     }
 
-    // 添加变动记录
-    private void addChangeRecord(ActionEvent e) {
-        // 1. 打开对话框获取用户输入的变动信息（假设已有对话框返回变动对象）
-        PersonnelChange change = showAddChangeDialog(); // 自定义方法，返回用户输入的变动信息
-        if (change == null) return;
-        Connection conn = null;
-        try {
-            conn = DBConnection.getConnection();
-            conn.setAutoCommit(false); // 开启事务（确保变动记录和员工更新同时成功/失败）
-            // 2. 添加人事变动记录
-            PersonnelChangeService changeService = new PersonnelChangeService();
-            System.out.println(changeService.getClass().getDeclaredMethods()); // 打印所有方法
-            System.out.println(changeService.getClass().getDeclaredFields());  // 打印所有属性
-            boolean isChangeAdded = changeService.addChange(change);
-            if (!isChangeAdded) {
-                throw new SQLException("添加变动记录失败");
-            }
-
-            // 3. 根据变动类型更新员工信息
-            EmployeeService empService = new EmployeeService();
-            Employee employee = empService.getEmployeeById(change.getEmployeeId()); // 需实现该方法
-            if (employee == null) {
-                throw new SQLException("未找到ID为" + change.getEmployeeId() + "的员工");
-            }
-
-            switch (change.getChangeType()) {
-                case "辞退":
-                    // 辞退→更新员工状态为“非在职”
-                    employee.setState('f');
-                    empService.updateEmployee(employee);
-                    break;
-                case "职务变动":
-                    // 职务变动→更新员工职位代码
-                    employee.setJobCode(change.getNewJobCode());
-                    empService.updateEmployee(employee);
-                    break;
-                case "部门变动":
-                    // 部门变动→更新员工部门ID
-                    employee.setDepartmentId(change.getNewDepartmentId());
-                    empService.updateEmployee(employee);
-                    break;
-                // 其他变动类型（如“新员工加入”一般通过员工添加界面触发，此处可忽略）
-            }
-
-            conn.commit(); // 事务提交
-            JOptionPane.showMessageDialog(this, "变动记录添加成功，员工信息已同步更新");
-            loadChangeData(); // 刷新变动列表
-        } catch (SQLException ex) {
-            if (conn != null) try { conn.rollback(); } catch (SQLException e1) {e1.printStackTrace();} // 事务回滚
-            ex.printStackTrace();
-
-            JOptionPane.showMessageDialog(this, "操作失败：" + ex.getMessage());
-
-        } finally {
-            if (conn != null) try { conn.close(); } catch (SQLException e1) {e1.printStackTrace();}
-        }
-    }
-
-    // 辅助方法：打开对话框获取变动信息（示例）
-    private PersonnelChange showAddChangeDialog() {
-        // 创建并显示人事变动对话框
-        PersonnelChangeDialog dialog = new PersonnelChangeDialog(
-                SwingUtil.getParentFrame(this),
-                "添加人事变动记录"
-        );
-
-        // 显示模态对话框
-        dialog.setVisible(true);
-
-        // 如果用户点击了确认按钮，返回输入的数据
-        if (dialog.isConfirmed()) {
-            return dialog.getPersonnelChange();
-        }
-
-        // 用户取消操作，返回null
-        return null;
-    }
+    // 添加变动记录功能已删除，统一使用员工管理界面的添加功能
 
 
     // 删除变动记录
@@ -383,4 +300,61 @@ public class PersonnelChangePanel extends JPanel {
         nextBtn.setEnabled(currentPage < totalPages);
     }
 
+    // 显示人事变动详细信息对话框
+    private void showChangeDetailDialog(int changeId) {
+        // 调用服务层获取详细信息
+        PersonnelChangeService service = new PersonnelChangeService();
+        PersonnelChange change = service.getChangeById(changeId);
+
+        if (change == null) {
+            JOptionPane.showMessageDialog(this, "未找到该记录的详细信息", "提示", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // 创建并显示详细信息对话框
+        JDialog detailDialog = new JDialog(SwingUtil.getParentFrame(this), "人事变动详细信息", true);
+        detailDialog.setLayout(new BorderLayout());
+        detailDialog.setSize(400, 300);
+        detailDialog.setLocationRelativeTo(this);
+
+        // 创建信息面板
+        JPanel infoPanel = new JPanel(new GridLayout(6, 2, 10, 10));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        // 添加信息标签和文本
+        infoPanel.add(new JLabel("记录ID:"));
+        infoPanel.add(new JLabel(String.valueOf(change.getId())));
+
+        infoPanel.add(new JLabel("员工ID:"));
+        infoPanel.add(new JLabel(String.valueOf(change.getEmployeeId())));
+
+        infoPanel.add(new JLabel("员工姓名:"));
+        infoPanel.add(new JLabel(change.getEmployeeName()));
+
+        infoPanel.add(new JLabel("变动类型:"));
+        infoPanel.add(new JLabel(change.getChangeType()));
+
+        infoPanel.add(new JLabel("变动描述:"));
+        JTextArea descriptionArea = new JTextArea(change.getDescription());
+        descriptionArea.setEditable(false);
+        descriptionArea.setLineWrap(true);
+        descriptionArea.setWrapStyleWord(true);
+        infoPanel.add(new JScrollPane(descriptionArea));
+
+        infoPanel.add(new JLabel("变动时间:"));
+        infoPanel.add(new JLabel(change.getChangeTime() != null ? change.getChangeTime().toString() : ""));
+
+        // 添加关闭按钮
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton closeBtn = new JButton("关闭");
+        closeBtn.addActionListener(e -> detailDialog.dispose());
+        buttonPanel.add(closeBtn);
+
+        // 添加到对话框
+        detailDialog.add(infoPanel, BorderLayout.CENTER);
+        detailDialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        // 显示对话框
+        detailDialog.setVisible(true);
+    }
 }

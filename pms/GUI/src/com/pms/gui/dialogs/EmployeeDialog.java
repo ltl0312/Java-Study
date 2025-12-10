@@ -229,15 +229,70 @@ public class EmployeeDialog extends JDialog {
      * 确认按钮逻辑：封装员工数据（部门/职位/学历用int代码）
      */
     private void confirmAction(ActionEvent e) {
-        // 校验职位是否有效
+        // 1. 姓名
+        String name = nameField.getText().trim();
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "姓名不能为空", "输入错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        employee.setName(name);
+
+        // 2. 性别
+        String sex = maleRadio.isSelected() ? "男" : "女";
+        employee.setSex(sex);
+
+        // 3. 部门
+        CodeNameItem deptItem = (CodeNameItem) departmentCombo.getSelectedItem();
+        if (deptItem == null || deptItem.getCode() <= 0) {
+            JOptionPane.showMessageDialog(this, "请选择有效的部门", "输入错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        employee.setDepartmentId(deptItem.getCode());
+
+        // 4. 职位
         CodeNameItem jobItem = (CodeNameItem) jobCombo.getSelectedItem();
         if (jobItem == null || jobItem.getCode() <= 0) {
             JOptionPane.showMessageDialog(this, "请选择有效的职位", "输入错误", JOptionPane.ERROR_MESSAGE);
-            return; // 终止保存，返回重新选择
+            return;
+        }
+        employee.setJobCode(jobItem.getCode());
+
+        // 5. 学历
+        CodeNameItem eduItem = (CodeNameItem) eduLevelCombo.getSelectedItem();
+        if (eduItem == null || eduItem.getCode() <= 0) {
+            JOptionPane.showMessageDialog(this, "请选择有效的学历", "输入错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        employee.setEduLevelCode(eduItem.getCode());
+
+        // 6. 生日
+        try {
+            String birthdayStr = birthdayField.getText().trim();
+            if (!birthdayStr.isEmpty()) {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                Date birthday = sdf.parse(birthdayStr);
+                employee.setBirthday(birthday);
+            }
+        } catch (java.text.ParseException ex) {
+            JOptionPane.showMessageDialog(this, "生日格式错误（正确格式：yyyy-MM-dd）", "输入错误", JOptionPane.ERROR_MESSAGE);
+            return;
         }
 
-        // 其他逻辑...
-        employee.setJobCode(jobItem.getCode()); // 确保赋值的是有效代码
+        // 7. 专业
+        employee.setSpecialty(specialtyField.getText().trim());
+
+        // 8. 地址
+        employee.setAddress(addressField.getText().trim());
+
+        // 9. 电话
+        employee.setTel(telField.getText().trim());
+
+        // 10. 邮箱
+        employee.setEmail(emailField.getText().trim());
+
+        // 11. 备注
+        employee.setRemark(remarkArea.getText().trim());
+
         confirmed = true;
         dispose();
     }
