@@ -3,16 +3,20 @@ package com.pms.gui.dialogs;
 import com.pms.model.PersonnelChange;
 import com.pms.model.Department;
 import com.pms.model.Employee;
+import com.pms.model.CodeNameItem;
 import com.pms.service.DepartmentService;
 import com.pms.service.EmployeeService;
-import com.pms.gui.dialogs.CodeNameItem;
+import com.pms.service.PersonnelChangeService;
+import com.pms.utils.SwingUtil;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -499,7 +503,70 @@ public class PersonnelChangeDialog extends JDialog {
         // 设置其他字段
         change.setEmployeeName(employeeNameField.getText().trim());
         change.setChangeType(changeType);
-        change.setDescription(descriptionArea.getText().trim());
+        
+        // 自动生成详细的变动描述
+        String description = "";
+        switch (changeType) {
+            case "新员工加入":
+                // 获取部门名称和职位名称
+                String newDeptName = ((CodeNameItem) newDepartmentCombo.getSelectedItem()).getName();
+                String newJobName = ((CodeNameItem) newJobCombo.getSelectedItem()).getName();
+                description = "新员工入职，部门：【" + newDeptName + "】，职位：【" + newJobName + "】";
+                break;
+            case "职务变动":
+                // 获取原职位名称和新职位名称
+                String oldJobName = ((CodeNameItem) oldJobCombo.getSelectedItem()).getName();
+                newJobName = ((CodeNameItem) newJobCombo.getSelectedItem()).getName();
+                
+                // 检查是否同时发生部门变动
+                String oldDeptName = "";
+                String deptName = "";
+                boolean hasDepartmentChange = false;
+                
+                if (oldDepartmentCombo.getSelectedItem() != null && newDepartmentCombo.getSelectedItem() != null) {
+                    oldDeptName = ((CodeNameItem) oldDepartmentCombo.getSelectedItem()).getName();
+                    deptName = ((CodeNameItem) newDepartmentCombo.getSelectedItem()).getName();
+                    hasDepartmentChange = !oldDeptName.equals(deptName);
+                }
+                
+                if (hasDepartmentChange) {
+                    // 同时发生部门和职务变动
+                    description = "部门从【" + oldDeptName + "】调整为【" + deptName + "】，职位从【" + oldJobName + "】调整为【" + newJobName + "】";
+                } else {
+                    // 仅职务变动
+                    description = "职位从【" + oldJobName + "】调整为【" + newJobName + "】";
+                }
+                break;
+            case "部门变动":
+                // 获取原部门名称和新部门名称
+                oldDeptName = ((CodeNameItem) oldDepartmentCombo.getSelectedItem()).getName();
+                newDeptName = ((CodeNameItem) newDepartmentCombo.getSelectedItem()).getName();
+                
+                // 检查是否同时发生职务变动
+                boolean hasJobChange = false;
+                String jobOldName = "";
+                String jobNewName = "";
+                
+                if (oldJobCombo.getSelectedItem() != null && newJobCombo.getSelectedItem() != null) {
+                    jobOldName = ((CodeNameItem) oldJobCombo.getSelectedItem()).getName();
+                    jobNewName = ((CodeNameItem) newJobCombo.getSelectedItem()).getName();
+                    hasJobChange = !jobOldName.equals(jobNewName);
+                }
+                
+                if (hasJobChange) {
+                    // 同时发生部门和职务变动
+                    description = "部门从【" + oldDeptName + "】调整为【" + newDeptName + "】，职位从【" + jobOldName + "】调整为【" + jobNewName + "】";
+                } else {
+                    // 仅部门变动
+                    description = "部门从【" + oldDeptName + "】调整为【" + newDeptName + "】";
+                }
+                break;
+            case "辞退":
+                // 保持原有的描述
+                description = "员工被辞退";
+                break;
+        }
+        change.setDescription(description);
         
         // 设置部门和职位信息
         change.setOldDepartmentId(oldDepartmentId);
@@ -507,8 +574,72 @@ public class PersonnelChangeDialog extends JDialog {
         change.setOldJobCode(oldJobCode);
         change.setNewJobCode(newJobCode);
 
-        confirmed = true;
-        dispose();
+        // 根据变动类型执行相应的员工操作
+        EmployeeService employeeService = new EmployeeService();
+        boolean success = false;
+        String message = "";
+
+        try {
+            switch (changeType) {
+                case "新员工加入":
+                    // 创建新员工对象并保存
+                    Employee newEmployee = new Employee();
+                    newEmployee.setId(employeeId);
+                    newEmployee.setName(employeeNameField.getText().trim());
+                    newEmployee.setDepartmentId(newDepartmentId);
+                    newEmployee.setJobCode(newJobCode);
+                    newEmployee.setState('t'); // 默认在职 ('t'表示在职)
+                    newEmployee.setPassword("123456"); // 默认密码
+                    newEmployee.setAuthority("staff"); // 默认权限
+                    success = employeeService.addEmployee(newEmployee);
+                    message = "新员工加入成功";
+                    break;
+                case "职务变动":
+                    // 更新员工职位
+                    Employee empToUpdate = employeeService.getEmployeeById(employeeId);
+                    if (empToUpdate != null) {
+                        empToUpdate.setJobCode(newJobCode);
+                        success = employeeService.updateEmployee(empToUpdate);
+                        message = "职务变动成功";
+                    }
+                    break;
+                case "部门变动":
+                    // 更新员工部门
+                    Employee empToMove = employeeService.getEmployeeById(employeeId);
+                    if (empToMove != null) {
+                        empToMove.setDepartmentId(newDepartmentId);
+                        success = employeeService.updateEmployee(empToMove);
+                        message = "部门变动成功";
+                    }
+                    break;
+                case "辞退":
+                    // 标记员工为离职
+                    Employee empToFire = employeeService.getEmployeeById(employeeId);
+                    if (empToFire != null) {
+                        empToFire.setState('f'); // 'f'表示离职
+                        success = employeeService.updateEmployee(empToFire);
+                        message = "员工已辞退";
+                    }
+                    break;
+            }
+
+            // 保存人事变动记录
+            if (success) {
+                PersonnelChangeService changeService = new PersonnelChangeService();
+                if (changeService.addChange(change)) {
+                    confirmed = true;
+                    SwingUtil.showInfoDialog(this, message);
+                    dispose();
+                } else {
+                    JOptionPane.showMessageDialog(this, "保存人事变动记录失败", "错误", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "操作失败，请重试", "错误", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "操作发生错误：" + ex.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     public boolean isConfirmed() {
@@ -522,5 +653,41 @@ public class PersonnelChangeDialog extends JDialog {
     // 获取变动类型下拉框 - 用于外部设置默认值
     public JComboBox<String> getChangeTypeCombo() {
         return changeTypeCombo;
+    }
+    
+    // 获取员工ID字段
+    public JTextField getEmployeeIdField() {
+        return employeeIdField;
+    }
+    
+    // 获取员工姓名字段
+    public JTextField getEmployeeNameField() {
+        return employeeNameField;
+    }
+    
+    // 获取新部门下拉框
+    public JComboBox<CodeNameItem> getDepartmentCombo() {
+        return newDepartmentCombo;
+    }
+    
+    // 获取新职位下拉框
+    public JComboBox<CodeNameItem> getJobCombo() {
+        return newJobCombo;
+    }
+    
+    // 根据部门ID加载职位列表（实际职位与部门无关，直接返回所有职位）
+    public List<CodeNameItem> loadJobsByDepartment(int departmentId) throws SQLException {
+        List<CodeNameItem> jobs = new ArrayList<>();
+        // 职位代码映射（从Employee类的getJobName方法获取）
+        String[] jobNames = {"部门经理", "高级工程师", "人事专员", "会计", "销售代表", "行政助理", "初级工程师", "财务主管", "测试工程师", "算法工程师", "市场专员", "销售经理", "后勤主管", "AI 训练师", "数据架构师"};
+        for (int i = 1; i <= jobNames.length; i++) {
+            jobs.add(new CodeNameItem(i, jobNames[i-1]));
+        }
+        return jobs;
+    }
+    
+    // 获取变动描述文本区域
+    public JTextArea getDescriptionArea() {
+        return descriptionArea;
     }
 }

@@ -92,12 +92,14 @@ public class EmployeePanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton addBtn = new JButton("添加");
         JButton editBtn = new JButton("编辑");
-        JButton deleteBtn = new JButton("删除");
+        JButton deleteBtn = new JButton("辞退");
+        JButton removeBtn = new JButton("删除");
         JButton refreshBtn = new JButton("刷新");
 
         addBtn.addActionListener(this::addEmployee);
         editBtn.addActionListener(this::editEmployee);
-        deleteBtn.addActionListener(this::deleteEmployee);
+        deleteBtn.addActionListener(this::dimissionEmployee);
+        removeBtn.addActionListener(this::deleteEmployee);
         refreshBtn.addActionListener(e -> {
             currentPage = 1; // 刷新时回到第一页
             loadEmployeeData();
@@ -106,6 +108,7 @@ public class EmployeePanel extends JPanel {
         btnPanel.add(addBtn);
         btnPanel.add(editBtn);
         btnPanel.add(deleteBtn);
+        btnPanel.add(removeBtn);
         btnPanel.add(refreshBtn);
         searchBtnPanel.add(btnPanel, BorderLayout.EAST);
 
@@ -398,25 +401,69 @@ public class EmployeePanel extends JPanel {
         }
 
         int employeeId = (int) employeeTable.getValueAt(selectedRow, 0);
-        // 修复：从数据库加载完整员工信息（替换原代码中手动创建Employee的部分）
+        // 从数据库加载完整员工信息
         Employee employee = getEmployeeById(employeeId);
         if (employee == null) {
             JOptionPane.showMessageDialog(this, "获取员工信息失败", "错误", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        EmployeeDialog dialog = new EmployeeDialog(SwingUtil.getParentFrame(this), "编辑员工", employee);
+        // 修改：使用人事变动界面进行编辑操作
+        PersonnelChangeDialog dialog = new PersonnelChangeDialog(SwingUtil.getParentFrame(this), "编辑员工信息");
+        // 设置为部门变动或职务变动
+        dialog.getChangeTypeCombo().setSelectedItem("职务变动");
+        // 设置员工信息
+        dialog.getEmployeeIdField().setText(String.valueOf(employee.getId()));
+        dialog.getEmployeeNameField().setText(employee.getName());
+        
+        // 加载所有部门数据
+        try {
+            // 先找到原部门的CodeNameItem
+            CodeNameItem originalDeptItem = null;
+            CodeNameItem originalJobItem = null;
+            
+            // 遍历部门下拉框找到原部门
+            for (int i = 0; i < dialog.getDepartmentCombo().getItemCount(); i++) {
+                CodeNameItem item = dialog.getDepartmentCombo().getItemAt(i);
+                if (item.getCode() == employee.getDepartmentId()) {
+                    originalDeptItem = item;
+                    break;
+                }
+            }
+            
+            // 设置原部门和新部门为当前部门
+            if (originalDeptItem != null) {
+                dialog.getDepartmentCombo().setSelectedItem(originalDeptItem);
+                // 加载职位列表
+                List<CodeNameItem> jobs = dialog.loadJobsByDepartment(employee.getDepartmentId());
+                DefaultComboBoxModel<CodeNameItem> jobModel = new DefaultComboBoxModel<>(jobs.toArray(new CodeNameItem[0]));
+                dialog.getJobCombo().setModel(jobModel);
+                
+                // 遍历职位列表找到原职位
+                for (CodeNameItem jobItem : jobs) {
+                    if (jobItem.getCode() == employee.getJobCode()) {
+                        originalJobItem = jobItem;
+                        break;
+                    }
+                }
+                
+                if (originalJobItem != null) {
+                    dialog.getJobCombo().setSelectedItem(originalJobItem);
+                }
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "加载部门和职位数据失败：" + ex.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
+        
+        // 设置员工ID和姓名为不可编辑
+        dialog.getEmployeeIdField().setEditable(false);
+        dialog.getEmployeeNameField().setEditable(false);
+        // 显示对话框
         dialog.setVisible(true);
         if (dialog.isConfirmed()) {
-            // 新增：调用更新方法
-            Employee updatedEmployee = dialog.getEmployee();
-            EmployeeService employeeService = new EmployeeService();
-            if (employeeService.updateEmployee(updatedEmployee)) {
-                SwingUtil.showInfoDialog(this, "更新成功");
-                loadEmployeeData(); // 刷新数据
-            } else {
-                SwingUtil.showErrorDialog(this, "更新失败");
-            }
+            SwingUtil.showInfoDialog(this, "更新成功");
+            loadEmployeeData(); // 刷新数据
         }
     }
 
@@ -465,6 +512,44 @@ public class EmployeePanel extends JPanel {
         EmployeeService service = new EmployeeService();
         return service.getEmployeeById(employeeId);
     }
+    private void dimissionEmployee(ActionEvent e) {
+        int selectedRow = employeeTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "请选择要辞退的员工", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int employeeId = (int) employeeTable.getValueAt(selectedRow, 0);
+        String employeeName = (String) employeeTable.getValueAt(selectedRow, 1);
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "确定要辞退员工 " + employeeName + " 吗？",
+                "确认辞退",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            // 使用人事变动界面进行辞退操作
+            PersonnelChangeDialog dialog = new PersonnelChangeDialog(SwingUtil.getParentFrame(this), "辞退员工");
+            // 设置为辞退变动类型
+            dialog.getChangeTypeCombo().setSelectedItem("辞退");
+            // 设置员工信息
+            dialog.getEmployeeIdField().setText(String.valueOf(employeeId));
+            dialog.getEmployeeNameField().setText(employeeName);
+            // 设置变动描述
+            dialog.getDescriptionArea().setText("员工被辞退");
+            // 设置员工ID和姓名为不可编辑
+            dialog.getEmployeeIdField().setEditable(false);
+            dialog.getEmployeeNameField().setEditable(false);
+            // 显示对话框
+            dialog.setVisible(true);
+            if (dialog.isConfirmed()) {
+                // 刷新表格数据，显示员工状态变化
+                loadEmployeeData();
+                SwingUtil.showInfoDialog(this, "员工已辞退");
+            }
+        }
+    }
+
     private void deleteEmployee(ActionEvent e) {
         int selectedRow = employeeTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -476,17 +561,20 @@ public class EmployeePanel extends JPanel {
         String employeeName = (String) employeeTable.getValueAt(selectedRow, 1);
 
         int confirm = JOptionPane.showConfirmDialog(this,
-                "确定要删除员工 " + employeeName + " 吗？",
+                "确定要从数据库中删除员工 " + employeeName + " 的所有信息吗？\n此操作不可恢复！",
                 "确认删除",
-                JOptionPane.YES_NO_OPTION);
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.ERROR_MESSAGE);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            EmployeeService employeeService = new EmployeeService();
-            if (employeeService.deleteEmployee(employeeId)) {  // 调用服务类删除方法
+            EmployeeService service = new EmployeeService();
+            boolean success = service.deleteEmployee(employeeId);
+            if (success) {
+                // 从表格中移除该行
                 tableModel.removeRow(selectedRow);
-                SwingUtil.showInfoDialog(this, "员工已删除");
+                SwingUtil.showInfoDialog(this, "员工信息已从数据库中删除");
             } else {
-                SwingUtil.showErrorDialog(this, "删除失败");
+                SwingUtil.showErrorDialog(this, "删除员工信息失败");
             }
         }
     }

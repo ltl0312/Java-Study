@@ -1,11 +1,12 @@
 package com.pms.gui.panels;
 
-import com.pms.gui.dialogs.PersonnelChangeDialog;
+
 import com.pms.model.Employee;
 import com.pms.model.PersonnelChange;
 import com.pms.service.EmployeeService;
 import com.pms.service.DepartmentService;
 import com.pms.service.PersonnelChangeService;
+import com.pms.gui.dialogs.PersonnelChangeDetailDialog;
 import com.pms.utils.DBConnection;
 import com.pms.utils.SwingUtil;
 import javax.swing.*;
@@ -117,7 +118,49 @@ public class PersonnelChangePanel extends JPanel {
             }
         });
 
-        // 移除双击事件监听，按照需求删除双击功能
+        // 添加双击事件,双击显示人事变动详细信息
+        // 优化双击事件处理，确保稳定触发
+        changeTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent evt) {
+                // 1. 验证事件源和点击条件：必须是左键双击且点击在表格内容区域
+                if (evt.getButton() != MouseEvent.BUTTON1 || evt.getClickCount() != 2) {
+                    return;
+                }
+
+                // 2. 确定点击位置是否在有效单元格上
+                int row = changeTable.rowAtPoint(evt.getPoint());
+                int col = changeTable.columnAtPoint(evt.getPoint());
+                if (row == -1 || col == -1) { // 点击在表格空白区域
+                    return;
+                }
+
+                // 3. 确保行被选中（处理表格选择模式可能的影响）
+                changeTable.setRowSelectionInterval(row, row);
+
+                // 4. 转换为模型索引（处理排序/过滤后的索引映射）
+                int modelRow = changeTable.convertRowIndexToModel(row);
+
+                try {
+                    // 5. 安全获取变动记录ID（避免类型转换异常）
+                    Object idObj = changeTable.getModel().getValueAt(modelRow, 0);
+                    if (!(idObj instanceof Integer)) {
+                        JOptionPane.showMessageDialog(PersonnelChangePanel.this,
+                                "无效的记录ID格式", "错误", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    int changeId = (Integer) idObj;
+
+                    // 6. 显示变动记录详细信息
+                    showChangeDetailDialog(changeId);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(PersonnelChangePanel.this,
+                            "显示详细信息失败: " + ex.getMessage(),
+                            "错误", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
 
         JScrollPane scrollPane = new JScrollPane(changeTable);
         add(scrollPane, BorderLayout.CENTER);
@@ -311,50 +354,12 @@ public class PersonnelChangePanel extends JPanel {
             return;
         }
 
-        // 创建并显示详细信息对话框
-        JDialog detailDialog = new JDialog(SwingUtil.getParentFrame(this), "人事变动详细信息", true);
-        detailDialog.setLayout(new BorderLayout());
-        detailDialog.setSize(400, 300);
-        detailDialog.setLocationRelativeTo(this);
-
-        // 创建信息面板
-        JPanel infoPanel = new JPanel(new GridLayout(6, 2, 10, 10));
-        infoPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        // 添加信息标签和文本
-        infoPanel.add(new JLabel("记录ID:"));
-        infoPanel.add(new JLabel(String.valueOf(change.getId())));
-
-        infoPanel.add(new JLabel("员工ID:"));
-        infoPanel.add(new JLabel(String.valueOf(change.getEmployeeId())));
-
-        infoPanel.add(new JLabel("员工姓名:"));
-        infoPanel.add(new JLabel(change.getEmployeeName()));
-
-        infoPanel.add(new JLabel("变动类型:"));
-        infoPanel.add(new JLabel(change.getChangeType()));
-
-        infoPanel.add(new JLabel("变动描述:"));
-        JTextArea descriptionArea = new JTextArea(change.getDescription());
-        descriptionArea.setEditable(false);
-        descriptionArea.setLineWrap(true);
-        descriptionArea.setWrapStyleWord(true);
-        infoPanel.add(new JScrollPane(descriptionArea));
-
-        infoPanel.add(new JLabel("变动时间:"));
-        infoPanel.add(new JLabel(change.getChangeTime() != null ? change.getChangeTime().toString() : ""));
-
-        // 添加关闭按钮
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JButton closeBtn = new JButton("关闭");
-        closeBtn.addActionListener(e -> detailDialog.dispose());
-        buttonPanel.add(closeBtn);
-
-        // 添加到对话框
-        detailDialog.add(infoPanel, BorderLayout.CENTER);
-        detailDialog.add(buttonPanel, BorderLayout.SOUTH);
-
-        // 显示对话框
-        detailDialog.setVisible(true);
+        // 创建并显示详细信息对话框（使用与员工详细信息界面相同的格式）
+        PersonnelChangeDetailDialog dialog = new PersonnelChangeDetailDialog(
+                SwingUtil.getParentFrame(this),
+                "人事变动详细信息",
+                change
+        );
+        dialog.setVisible(true);
     }
 }

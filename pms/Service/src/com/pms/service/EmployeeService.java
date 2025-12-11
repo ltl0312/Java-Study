@@ -50,17 +50,8 @@ public class EmployeeService extends BaseService {
             e.printStackTrace();
             return false;
         }
-        if (success) {
-            PersonnelChange change = new PersonnelChange();
-            change.setEmployeeId(employee.getId());
-            change.setEmployeeName(employee.getName());
-            change.setChangeType("新员工加入");
-            change.setDescription("新员工入职，部门：" + employee.getDepartmentName());
-            change.setChangeTime(Timestamp.valueOf(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())));
-
-            PersonnelChangeService changeService = new PersonnelChangeService();
-            changeService.addChange(change);
-        }
+        // 人事变动记录已在PersonnelChangeDialog中保存，这里不再重复保存
+        
         return success;
     }
 
@@ -182,41 +173,8 @@ public class EmployeeService extends BaseService {
         }
 
         // 3. 若更新成功，记录变动（职位/部门）
-        if (success) {
-            // 检查是否是员工状态变更（如辞退），如果是则不记录职位/部门变动
-            if (employee.getState() == 'f') {
-                // 员工被标记为离职，不记录职位/部门变动
-                return success;
-            }
-            
-            String employeeName = employee.getName();
-            String newJob = employee.getJobName();
-            int newDeptId = employee.getDepartmentId();
-            PersonnelChangeService changeService = new PersonnelChangeService();
-
-
-            // 记录职位变动（原有逻辑）
-            if (!oldJob.equals(newJob)) {
-                PersonnelChange jobChange = new PersonnelChange();
-                jobChange.setEmployeeId(employee.getId());
-                jobChange.setEmployeeName(employeeName);
-                jobChange.setChangeType("职务变动");
-                jobChange.setDescription("职位从【" + oldJob + "】调整为【" + newJob + "】");
-                jobChange.setChangeTime(new Timestamp(System.currentTimeMillis()));
-                changeService.addChange(jobChange);
-            }
-
-            // 新增：记录部门变动
-            if (oldDeptId != newDeptId) {
-                PersonnelChange deptChange = new PersonnelChange();
-                deptChange.setEmployeeId(employee.getId());
-                deptChange.setEmployeeName(employeeName);
-                deptChange.setChangeType("部门变动");
-                deptChange.setDescription("部门从【" + getDeptName(oldDeptId) + "】调整为【" + employee.getDepartmentName() + "】");
-                deptChange.setChangeTime(new Timestamp(System.currentTimeMillis()));
-                changeService.addChange(deptChange);
-            }
-        }
+        // 人事变动记录已在PersonnelChangeDialog中保存，这里不再重复保存
+        
         return success;
     }
 
