@@ -93,7 +93,7 @@ public class EmployeeService extends BaseService {
                 success = (rows > 0);
             }
             
-            // 3. 删除成功后记录人事变动（非事务性，即使记录失败也不影响删除）
+            // 4. 删除成功后记录人事变动（非事务性，即使记录失败也不影响删除）
             if (success) {
                 PersonnelChange change = new PersonnelChange();
                 change.setEmployeeId(employeeId);
@@ -255,13 +255,16 @@ public class EmployeeService extends BaseService {
                 emp.setId(rs.getInt("id"));
                 emp.setName(rs.getString("name"));
                 emp.setSex(rs.getString("sex"));
+                emp.setBirthday(rs.getDate("birthday"));
+                emp.setEduLevelCode(rs.getInt("edu_level"));
                 emp.setDepartmentId(rs.getInt("department"));
                 emp.setDepartmentName(rs.getString("dept_name"));
                 emp.setJobCode(rs.getInt("job"));
                 emp.setJobName(rs.getString("job_name"));
                 emp.setTel(rs.getString("tel"));
+                emp.setEmail(rs.getString("email"));
+                emp.setAddress(rs.getString("address"));
                 emp.setState(rs.getString("state").charAt(0));
-                // 设置其他需要的字段
                 employees.add(emp);
             }
         } catch (SQLException e) {
@@ -336,11 +339,15 @@ public class EmployeeService extends BaseService {
                 emp.setId(rs.getInt("id"));
                 emp.setName(rs.getString("name"));
                 emp.setSex(rs.getString("sex"));
+                emp.setBirthday(rs.getDate("birthday"));
+                emp.setEduLevelCode(rs.getInt("edu_level"));
                 emp.setDepartmentId(rs.getInt("department"));
                 emp.setDepartmentName(rs.getString("dept_name"));
                 emp.setJobCode(rs.getInt("job"));
                 emp.setJobName(rs.getString("job_name"));
                 emp.setTel(rs.getString("tel"));
+                emp.setEmail(rs.getString("email"));
+                emp.setAddress(rs.getString("address"));
                 emp.setState(rs.getString("state").charAt(0));
                 employees.add(emp);
             }

@@ -9,5 +9,8 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="mysql-connector-j-8.0.33" level="project" />
     <orderEntry type="module" module-name="Service" />
+    <orderEntry type="library" name="poi-5.2.3" level="project" />
+    <orderEntry type="library" name="commons-io-2.13.0" level="project" />
+    <orderEntry type="module" module-name="DataModel" />
   </component>
 </module>

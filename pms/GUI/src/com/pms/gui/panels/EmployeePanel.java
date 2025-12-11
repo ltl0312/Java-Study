@@ -8,6 +8,7 @@ import com.pms.model.CodeNameItem;
 import com.pms.model.Employee;
 import com.pms.service.EmployeeService;
 import com.pms.utils.DBConnection;
+import com.pms.utils.ExcelExportUtil;
 import com.pms.utils.SwingUtil;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -15,6 +16,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -95,6 +97,7 @@ public class EmployeePanel extends JPanel {
         JButton deleteBtn = new JButton("辞退");
         JButton removeBtn = new JButton("删除");
         JButton refreshBtn = new JButton("刷新");
+        JButton exportBtn = new JButton("导出报表");
 
         addBtn.addActionListener(this::addEmployee);
         editBtn.addActionListener(this::editEmployee);
@@ -104,12 +107,14 @@ public class EmployeePanel extends JPanel {
             currentPage = 1; // 刷新时回到第一页
             loadEmployeeData();
         });
+        exportBtn.addActionListener(this::exportReport);
 
         btnPanel.add(addBtn);
         btnPanel.add(editBtn);
         btnPanel.add(deleteBtn);
         btnPanel.add(removeBtn);
         btnPanel.add(refreshBtn);
+        btnPanel.add(exportBtn);
         searchBtnPanel.add(btnPanel, BorderLayout.EAST);
 
         toolPanel.add(searchBtnPanel, BorderLayout.CENTER);
@@ -384,6 +389,10 @@ public class EmployeePanel extends JPanel {
         // 自动选择"新员工加入"类型
         dialog.getChangeTypeCombo().setSelectedItem("新员工加入");
         
+        // 确保员工ID和姓名字段是可编辑的，特别是员工姓名
+        dialog.getEmployeeIdField().setEditable(false); // 员工ID由系统自动生成
+        dialog.getEmployeeNameField().setEditable(true); // 确保员工姓名字段可编辑
+        
         dialog.setVisible(true);
 
         // 如果用户点击了确认按钮，员工会通过人事变动自动添加
@@ -604,6 +613,95 @@ public class EmployeePanel extends JPanel {
             case 3: return "d.name";        // 部门名称
             case 4: return "j.description"; // 职位名称
             default: return "p.id";         // 默认按ID排序
+        }
+    }
+    
+    /**
+     * 导出员工信息报表
+     */
+    private void exportReport(ActionEvent e) {
+        try {
+            // 显示导出确认对话框
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "确定要导出员工信息报表吗？\n导出的报表将按部门分类并统计各部门在职/离职人数。",
+                    "确认导出", JOptionPane.YES_NO_OPTION);
+            
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
+            
+            // 选择保存文件路径
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("选择保存文件路径");
+            fileChooser.setSelectedFile(new File("员工信息报表_" + new java.text.SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date()) + ".xlsx"));
+            
+            int result = fileChooser.showSaveDialog(this);
+            if (result != JFileChooser.APPROVE_OPTION) {
+                return;
+            }
+            
+            String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+            
+            // 显示导出进度提示
+            JDialog progressDialog = new JDialog(SwingUtil.getParentFrame(this), "导出中...", true);
+            progressDialog.setLayout(new FlowLayout());
+            progressDialog.add(new JLabel("正在导出员工信息报表，请稍候..."));
+            progressDialog.setSize(300, 100);
+            progressDialog.setLocationRelativeTo(this);
+            
+            // 在后台线程执行导出操作
+            new Thread(() -> {
+                try {
+                    // 获取所有员工数据
+                    EmployeeService service = new EmployeeService();
+                    List<Employee> allEmployees = new ArrayList<>();
+                    
+                    // 获取员工总数
+                    int totalCount = service.getEmployeeCountByCondition(
+                            "", -1, -1, "");
+                    
+                    // 分页获取所有员工数据
+                    int pageSize = 100; // 每页获取100条
+                    int totalPages = (totalCount + pageSize - 1) / pageSize;
+                    
+                    for (int i = 1; i <= totalPages; i++) {
+                        int offset = (i - 1) * pageSize;
+                        List<Employee> pageEmployees = service.getEmployeesByCondition(
+                                "", -1, -1, "", offset, pageSize, "p.id", "ASC");
+                        allEmployees.addAll(pageEmployees);
+                    }
+                    
+                    // 导出Excel文件
+                    ExcelExportUtil.exportEmployeeReport(allEmployees, filePath);
+                    
+                    // 关闭进度对话框
+                    SwingUtilities.invokeLater(() -> {
+                        progressDialog.dispose();
+                        // 显示导出成功提示
+                        JOptionPane.showMessageDialog(this,
+                                "员工信息报表导出成功！\n文件路径: " + filePath,
+                                "导出成功", JOptionPane.INFORMATION_MESSAGE);
+                    });
+                    
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    SwingUtilities.invokeLater(() -> {
+                        progressDialog.dispose();
+                        JOptionPane.showMessageDialog(this,
+                                "导出失败: " + ex.getMessage(),
+                                "导出错误", JOptionPane.ERROR_MESSAGE);
+                    });
+                }
+            }).start();
+            
+            // 显示进度对话框
+            progressDialog.setVisible(true);
+            
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                    "导出员工信息报表失败: " + ex.getMessage(),
+                    "导出错误", JOptionPane.ERROR_MESSAGE);
         }
     }
 

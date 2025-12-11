@@ -202,12 +202,12 @@ public class PersonnelChangeDialog extends JDialog {
                         
                         EmployeeService employeeService = new EmployeeService();
                         int newEmployeeId = employeeService.generateEmployeeIdByDepartmentId(deptItem.getCode());
+                        isGeneratingId = true; // 开始生成ID时设置标志位
                         employeeIdField.setText(String.valueOf(newEmployeeId));
+                        isGeneratingId = false; // 生成ID后重置标志位
                         
                         // 恢复保存的员工姓名
-                        if (!currentEmployeeName.isEmpty()) {
-                            employeeNameField.setText(currentEmployeeName);
-                        }
+                        employeeNameField.setText(currentEmployeeName); // 始终恢复姓名，无论是否为空
                     }
                 }
             }
@@ -218,11 +218,12 @@ public class PersonnelChangeDialog extends JDialog {
     }
 
     // 处理员工ID变化，自动获取员工信息
+    private boolean isGeneratingId = false; // 添加标志位
+
     private void handleEmployeeIdChange() {
         String employeeIdStr = employeeIdField.getText().trim();
-        // 只在员工ID完全为空时才清空姓名
-        // 当员工ID正在变化时（例如从一个值变为另一个值），不要清空姓名
-        if (employeeIdStr.isEmpty()) {
+        // 只在员工ID完全为空且不是生成ID过程时才清空姓名
+        if (employeeIdStr.isEmpty() && !isGeneratingId) {
             employeeNameField.setText("");
             return;
         }
@@ -416,8 +417,16 @@ public class PersonnelChangeDialog extends JDialog {
             EmployeeService employeeService = new EmployeeService();
             employeeId = employeeService.generateEmployeeIdByDepartmentId(departmentId);
             
-            // 将生成的员工ID显示在员工ID字段中
+            // 保存当前员工姓名
+            String currentEmployeeName = employeeNameField.getText().trim();
+            
+            // 将生成的员工ID显示在员工ID字段中，使用标志位防止清空姓名
+            isGeneratingId = true;
             employeeIdField.setText(String.valueOf(employeeId));
+            isGeneratingId = false;
+            
+            // 恢复员工姓名
+            employeeNameField.setText(currentEmployeeName);
         } else {
             // 其他类型需要验证员工ID
             if (employeeIdField.getText().trim().isEmpty()) {
@@ -619,6 +628,15 @@ public class PersonnelChangeDialog extends JDialog {
                     newEmployee.setState('t'); // 默认在职 ('t'表示在职)
                     newEmployee.setPassword("123456"); // 默认密码
                     newEmployee.setAuthority("staff"); // 默认权限
+                    // 设置必要的字段，避免SQL执行失败
+                    newEmployee.setSex("男"); // 默认性别
+                    newEmployee.setBirthday(new Date()); // 默认生日
+                    newEmployee.setEduLevelCode(1); // 默认学历代码
+                    newEmployee.setSpecialty(""); // 默认为空
+                    newEmployee.setAddress(""); // 默认为空
+                    newEmployee.setTel(""); // 默认为空
+                    newEmployee.setEmail(""); // 默认为空
+                    newEmployee.setRemark(""); // 默认为空
                     success = employeeService.addEmployee(newEmployee);
                     message = "新员工加入成功";
                     break;

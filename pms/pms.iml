@@ -6,5 +6,11 @@
     <orderEntry type="jdk" jdkName="21" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="mysql-connector-j-8.0.33" level="project" />
+    <orderEntry type="library" name="commons-compress-1.23.0" level="project" />
+    <orderEntry type="library" name="poi-5.2.3" level="project" />
+    <orderEntry type="library" name="commons-io-2.13.0" level="project" />
+    <orderEntry type="library" name="commons-collections4-4.4" level="project" />
+    <orderEntry type="library" name="log4j-api-2.17.1" level="project" />
+    <orderEntry type="library" name="log4j-core-2.17.1" level="project" />
   </component>
 </module>
