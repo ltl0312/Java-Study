@@ -1,7 +1,7 @@
 package com.pms.service;
 
 import com.pms.model.Employee;
-import com.pms.model.Job;
+
 import com.pms.model.PersonnelChange;
 import com.pms.utils.DBConnection;
 import java.util.Date;
@@ -528,13 +528,18 @@ public class EmployeeService extends BaseService {
     
     /**
      * 根据部门编号自动生成员工ID
-     * 生成规则：部门编号 + 三位序列号，例如部门编号为1，员工ID为1001, 1002, 1003...
+     * 生成规则：8位数字，前四位固定为公司代码6504，中间两位为部门ID，后两位为部门内员工编号
+     * 例如：技术部(1)的员工ID为65040101, 65040102, 65040103...
+     * 人事部(2)的员工ID为65040201, 65040202, 65040203...
      * 注意：需要检查所有部门的员工ID以确保唯一性，因为员工变动部门时ID会保留
      */
     public int generateEmployeeIdByDepartmentId(int departmentId) {
-        // 1. 先查询该部门中的最大员工ID
-        int maxDeptId = 0;
-        String sqlDept = "SELECT MAX(id) FROM person WHERE department = ?";
+        // 1. 构建部门ID的前缀（固定为两位数字，不足两位前面补0）
+        String deptPrefix = String.format("%02d", departmentId);
+        
+        // 2. 查询该部门中所有符合新规则（前四位为6504）的员工ID
+        String sqlDept = "SELECT id FROM person WHERE department = ? AND id LIKE '6504%' ORDER BY id DESC";
+        List<Integer> deptIds = new ArrayList<>();
         
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sqlDept)) {
@@ -542,42 +547,60 @@ public class EmployeeService extends BaseService {
             pstmt.setInt(1, departmentId);
             ResultSet rs = pstmt.executeQuery();
             
-            if (rs.next() && rs.getInt(1) > 0) {
-                maxDeptId = rs.getInt(1);
+            while (rs.next()) {
+                deptIds.add(rs.getInt(1));
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         
-        // 2. 同时查询整个系统中的最大员工ID，确保生成的ID唯一
-        int maxSystemId = 0;
-        String sqlAll = "SELECT MAX(id) FROM person";
-        
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sqlAll)) {
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next() && rs.getInt(1) > 0) {
-                maxSystemId = rs.getInt(1);
+        // 3. 提取出部门内的最大编号
+        int maxDeptSeq = 0;
+        for (int id : deptIds) {
+            String idStr = String.valueOf(id);
+            // 确保ID是8位且前四位是6504
+            if (idStr.length() == 8 && idStr.startsWith("6504")) {
+                // 提取部门ID部分和序号部分
+                String idDept = idStr.substring(4, 6);
+                if (idDept.equals(deptPrefix)) {
+                    // 提取后两位序号
+                    int seq = Integer.parseInt(idStr.substring(6, 8));
+                    if (seq > maxDeptSeq) {
+                        maxDeptSeq = seq;
+                    }
+                }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         
-        // 3. 生成新的员工ID
-        int prefix = departmentId * 1000;
-        int newId = prefix + 1;
+        // 4. 生成新的员工ID
+        int newSeq = maxDeptSeq + 1;
+        int newId;
+        boolean idExists;
         
-        // 如果部门中已有员工，则在部门最大ID基础上加1
-        if (maxDeptId > prefix) {
-            newId = maxDeptId + 1;
-        }
-        
-        // 确保生成的ID大于系统中任何已有的ID
-        if (maxSystemId >= newId) {
-            newId = maxSystemId + 1;
-        }
+        // 使用循环代替递归检查ID是否存在
+        do {
+            String newIdStr = "6504" + deptPrefix + String.format("%02d", newSeq);
+            newId = Integer.parseInt(newIdStr);
+            
+            // 检查生成的ID是否已存在于系统中（防止部门变动导致的ID重复）
+            String checkSql = "SELECT COUNT(*) FROM person WHERE id = ?";
+            idExists = false;
+            
+            try (Connection conn = DBConnection.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(checkSql)) {
+                
+                pstmt.setInt(1, newId);
+                ResultSet rs = pstmt.executeQuery();
+                
+                if (rs.next() && rs.getInt(1) > 0) {
+                    idExists = true;
+                    newSeq++;
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                idExists = false; // 如果数据库查询出错，假设ID可用
+            }
+        } while (idExists);
         
         return newId;
     }

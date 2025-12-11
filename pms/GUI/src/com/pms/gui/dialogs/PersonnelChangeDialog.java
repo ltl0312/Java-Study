@@ -188,6 +188,31 @@ public class PersonnelChangeDialog extends JDialog {
             autoSelectCurrentPosition();
         });
 
+        // 部门选择监听，用于新员工加入时自动生成员工ID
+        newDepartmentCombo.addActionListener(e -> {
+            String changeType = (String) changeTypeCombo.getSelectedItem();
+            if (changeType != null && changeType.equals("新员工加入")) {
+                Object selectedDeptItem = newDepartmentCombo.getSelectedItem();
+                if (selectedDeptItem instanceof CodeNameItem) {
+                    CodeNameItem deptItem = (CodeNameItem) selectedDeptItem;
+                    // 只在选择了有效的部门时生成ID（不是默认的"-- 请选择 --"项）
+                    if (deptItem.getCode() > 0) {
+                        // 保存当前员工姓名，避免在ID变化时被清空
+                        String currentEmployeeName = employeeNameField.getText().trim();
+                        
+                        EmployeeService employeeService = new EmployeeService();
+                        int newEmployeeId = employeeService.generateEmployeeIdByDepartmentId(deptItem.getCode());
+                        employeeIdField.setText(String.valueOf(newEmployeeId));
+                        
+                        // 恢复保存的员工姓名
+                        if (!currentEmployeeName.isEmpty()) {
+                            employeeNameField.setText(currentEmployeeName);
+                        }
+                    }
+                }
+            }
+        });
+
         // 初始隐藏字段
         updateFieldVisibility();
     }
@@ -195,6 +220,8 @@ public class PersonnelChangeDialog extends JDialog {
     // 处理员工ID变化，自动获取员工信息
     private void handleEmployeeIdChange() {
         String employeeIdStr = employeeIdField.getText().trim();
+        // 只在员工ID完全为空时才清空姓名
+        // 当员工ID正在变化时（例如从一个值变为另一个值），不要清空姓名
         if (employeeIdStr.isEmpty()) {
             employeeNameField.setText("");
             return;
@@ -210,6 +237,7 @@ public class PersonnelChangeDialog extends JDialog {
                 // 如果员工存在且当前已选择了变动类型，自动显示当前职位/部门
                 autoSelectCurrentPosition();
             }
+            // 如果员工不存在（新生成的ID），保留当前输入的员工姓名
         } catch (NumberFormatException ex) {
             // 员工ID不是数字，不处理
         }
@@ -324,8 +352,8 @@ public class PersonnelChangeDialog extends JDialog {
                 // 新员工不需要显示原部门和原职位
                 showOldDepartmentFields = false;
                 showOldJobFields = false;
-                // 新员工不需要输入员工ID，自动生成
-                showEmployeeIdFields = false;
+                // 新员工显示自动生成的员工ID
+                showEmployeeIdFields = true;
                 break;
         }
 

@@ -1,6 +1,7 @@
 package com.pms.gui.dialogs;
 
 import com.pms.model.Employee;
+import com.pms.model.CodeNameItem;
 import com.pms.utils.DBConnection;
 import com.pms.utils.SwingUtil;
 

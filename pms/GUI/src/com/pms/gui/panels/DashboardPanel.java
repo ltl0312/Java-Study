@@ -4,6 +4,7 @@ import com.pms.utils.DBConnection;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class DashboardPanel extends JPanel {
     private JPanel statsPanel;
@@ -28,26 +31,31 @@ public class DashboardPanel extends JPanel {
 
         // 顶部标题优化
         JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBackground(new Color(245, 245, 245));
+        topPanel.setBackground(new java.awt.Color(245, 245, 245));
         topPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY),
-                BorderFactory.createEmptyBorder(15, 0, 15, 0)
+                BorderFactory.createMatteBorder(0, 0, 1, 0, java.awt.Color.LIGHT_GRAY),
+                BorderFactory.createEmptyBorder(15, 20, 15, 20)
         ));
         topPanel.setOpaque(true);
         
         // 标题标签
         JLabel titleLabel = new JLabel("系统概览", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 24));
+        titleLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.BOLD, 24));
         topPanel.add(titleLabel, BorderLayout.CENTER);
+        
+        // 添加按钮面板
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        buttonPanel.setOpaque(false);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 20));
         
         // 添加手动刷新按钮
         JButton refreshButton = new JButton("刷新");
-        refreshButton.setFont(new Font("微软雅黑", Font.PLAIN, 14));
-        refreshButton.setBackground(new Color(33, 150, 243));
-        refreshButton.setForeground(Color.WHITE);
+        refreshButton.setFont(new java.awt.Font("微软雅黑", java.awt.Font.PLAIN, 14));
+        refreshButton.setBackground(new java.awt.Color(33, 150, 243));
+        refreshButton.setForeground(java.awt.Color.WHITE);
         refreshButton.setBorder(BorderFactory.createEmptyBorder(5, 15, 5, 15));
         refreshButton.setFocusPainted(false);
-        refreshButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        refreshButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         
         // 添加按钮点击事件监听器
         refreshButton.addActionListener(e -> {
@@ -56,19 +64,15 @@ public class DashboardPanel extends JPanel {
             updateTimeLabel();
         });
         
-        // 右侧面板放置刷新按钮
-        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        rightPanel.setOpaque(false);
-        rightPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 20));
-        rightPanel.add(refreshButton);
-        topPanel.add(rightPanel, BorderLayout.EAST);
+        buttonPanel.add(refreshButton);
+        topPanel.add(buttonPanel, BorderLayout.EAST);
         
         add(topPanel, BorderLayout.NORTH);
 
         // 统计卡片面板优化
         this.statsPanel = new JPanel(new GridLayout(2, 2, 15, 15));
         statsPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
-        statsPanel.setBackground(new Color(249, 249, 249)); // 浅灰背景
+        statsPanel.setBackground(new java.awt.Color(249, 249, 249)); // 浅灰背景
 
         // 添加统计卡片（使用新的配色方案）
         refreshStatsCards();
@@ -78,21 +82,21 @@ public class DashboardPanel extends JPanel {
         // 底部信息优化
         JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         footerPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 15));
-        footerPanel.setBackground(new Color(245, 245, 245));
+        footerPanel.setBackground(new java.awt.Color(245, 245, 245));
         this.timeLabel = new JLabel("数据更新时间: " +
                 java.time.LocalDateTime.now().toString().substring(0, 16));
-        timeLabel.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        timeLabel.setForeground(new Color(102, 102, 102));
+        timeLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.PLAIN, 12));
+        timeLabel.setForeground(new java.awt.Color(102, 102, 102));
         footerPanel.add(timeLabel);
         add(footerPanel, BorderLayout.SOUTH);
     }
 
     // 修改createStatCard方法，支持显示细分数据
-    private JPanel createStatCard(String title, String value, Color valueColor, Color bgColor, List<String[]> details, boolean isDepartmentDetails) {
+    private JPanel createStatCard(String title, String value, java.awt.Color valueColor, java.awt.Color bgColor, List<String[]> details, boolean isDepartmentDetails) {
         JPanel card = new JPanel(new BorderLayout());
         // 卡片阴影和边框效果
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                BorderFactory.createLineBorder(new java.awt.Color(220, 220, 220)),
                 BorderFactory.createEmptyBorder(15, 15, 15, 15)
         ));
         card.setBackground(bgColor); // 卡片背景色
@@ -104,14 +108,14 @@ public class DashboardPanel extends JPanel {
 
         // 标题
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("微软雅黑", Font.PLAIN, 16));
-        titleLabel.setForeground(new Color(102, 102, 102));
+        titleLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.PLAIN, 16));
+        titleLabel.setForeground(new java.awt.Color(102, 102, 102));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         card.add(titleLabel, BorderLayout.NORTH);
 
         // 主数值
         JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("微软雅黑", Font.BOLD, 28));
+        valueLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.BOLD, 28));
         valueLabel.setForeground(valueColor);
         valueLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         card.add(valueLabel, BorderLayout.CENTER);
@@ -135,8 +139,8 @@ public class DashboardPanel extends JPanel {
                     String changeText = detail[0] + ": " + detail[1] + "条";
                     detailLabel = new JLabel(changeText);
                 }
-                detailLabel.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-                detailLabel.setForeground(new Color(128, 128, 128));
+                detailLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.PLAIN, 12));
+                detailLabel.setForeground(new java.awt.Color(128, 128, 128));
                 rowPanel.add(detailLabel);
                 detailPanel.add(rowPanel);
             }
@@ -150,27 +154,27 @@ public class DashboardPanel extends JPanel {
     }
     
     // 重载方法，用于不需要细分内容的卡片
-    private JPanel createStatCard(String title, String value, Color valueColor, Color bgColor) {
+    private JPanel createStatCard(String title, String value, java.awt.Color valueColor, java.awt.Color bgColor) {
         return createStatCard(title, value, valueColor, bgColor, null, false);
     }
 
     /**
      * 创建统计卡片
      */
-    private JPanel createStatCard(String title, String value, Color color) {
+    private JPanel createStatCard(String title, String value, java.awt.Color color) {
         JPanel card = new JPanel(new BorderLayout());
-        card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
-        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createLineBorder(java.awt.Color.LIGHT_GRAY));
+        card.setBackground(java.awt.Color.WHITE);
 
         // 标题
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        titleLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.PLAIN, 14));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         card.add(titleLabel, BorderLayout.NORTH);
 
         // 数值
         JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("微软雅黑", Font.BOLD, 24));
+        valueLabel.setFont(new java.awt.Font("微软雅黑", java.awt.Font.BOLD, 24));
         valueLabel.setForeground(color);
         valueLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         card.add(valueLabel, BorderLayout.CENTER);
@@ -419,13 +423,13 @@ public class DashboardPanel extends JPanel {
         
         // 重新添加统计卡片
         statsPanel.add(createStatCard("总员工数", getTotalEmployeeCount() + " 人",
-                new Color(76, 175, 80), new Color(232, 245, 233), deptEmployeeCounts, true));
+                new java.awt.Color(76, 175, 80), new java.awt.Color(232, 245, 233), deptEmployeeCounts, true));
         statsPanel.add(createStatCard("部门总数", getDepartmentCount() + " 个",
-                new Color(33, 150, 243), new Color(227, 242, 253)));
+                new java.awt.Color(33, 150, 243), new java.awt.Color(227, 242, 253)));
         statsPanel.add(createStatCard("在职员工", getActiveEmployeeCount() + " 人",
-                new Color(255, 152, 0), new Color(255, 248, 225), deptActiveCounts, true));
+                new java.awt.Color(255, 152, 0), new java.awt.Color(255, 248, 225), deptActiveCounts, true));
         statsPanel.add(createStatCard("人事变动", getPersonnelChanges() + " 条",
-                new Color(244, 67, 54), new Color(255, 235, 238), changeTypeCounts, false));
+                new java.awt.Color(244, 67, 54), new java.awt.Color(255, 235, 238), changeTypeCounts, false));
         
         // 重新布局面板
         statsPanel.revalidate();
@@ -439,6 +443,8 @@ public class DashboardPanel extends JPanel {
         timeLabel.setText("数据更新时间: " +
                 java.time.LocalDateTime.now().toString().substring(0, 16));
     }
+    
+
     
     /**
      * 停止自动刷新（清理资源）
